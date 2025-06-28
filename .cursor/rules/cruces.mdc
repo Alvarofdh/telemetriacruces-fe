@@ -1,0 +1,40 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+// .cursor/config.json
+{
+  "rules": [
+    {
+      "name": "Tesis Cruces Ferroviarios",
+      "pattern": "**/*",                 
+      "priority": 100,                   
+      "description": [
+        "Este proyecto es la tesis de Ingeniería en Informática sobre un",
+        "Sistema de Monitoreo de Cruces Ferroviarios.",
+        "",
+        "❖ **Objetivo**: Automatizar la lectura de sensores (ESP32) y controlar estados",
+        "  del PLC (DVP28SV) para asegurar el funcionamiento seguro de los cruces.",
+        "",
+        "❖ **Arquitectura**:",
+        "  • **Hardware**: ESP32-WROOM-32U capturando datos de batería, estado de",
+        "    sensores y pasos de tren.",
+        "  • **PLC**: Controla barreras y señalización, se integra con el ESP32 vía Modbus.",
+        "  • **Base de datos**: PostgreSQL con tablas `cruce`, `sensor`, `registro_mantenimiento`, etc.",
+        "  • **Backend**: Django REST API exponiendo endpoints en `/api/cruces`, `/api/sensores`, etc.",
+        "  • **Frontend**: React + Vite + TailwindCSS mostrando tarjetas con el estado de cada cruce.",
+        "",
+        "❖ **Flujo de datos**: ESP32 → API Django → BD PostgreSQL → Frontend React.",
+        "",
+        "❖ **Convenciones**:  
+           – Archivos en `src/components` para UI,  
+           – `cruces_ferroviarios` como nombre de DB,  
+           – env vars en `.env.local`,  
+           – uso de hooks `useFetchCruces()` para llamadas a la API.",
+        "",
+        "Cuando trabajes en cualquier parte del código, Cursor podrá evocar esta descripción"
+      ]
+    }
+  ]
+}
