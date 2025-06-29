@@ -1,9 +1,11 @@
 // src/App.jsx
 import React, { useState } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { ThemeProvider } from './contexts/ThemeContext'
 import { CrossingList } from './components/CrossingList'
 import { AlertPanel } from './components/AlertPanel'
 import { CruceDetail } from './components/CruceDetail'
+import { ThemeToggle } from './components/ThemeToggle'
 
 function Dashboard() {
   const [searchTerm, setSearchTerm] = useState('')
@@ -19,28 +21,29 @@ function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
       {/* Header Principal */}
-      <header className="bg-white shadow-lg border-b border-gray-200">
+      <header className="bg-white dark:bg-gray-800 shadow-lg border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center space-x-4">
-              <div className="flex items-center justify-center w-12 h-12 bg-blue-600 rounded-lg">
+              <div className="flex items-center justify-center w-12 h-12 bg-blue-600 dark:bg-blue-500 rounded-lg">
                 <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Sistema de Monitoreo</h1>
-                <p className="text-gray-600">Cruces Ferroviarios Inteligentes</p>
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Sistema de Monitoreo</h1>
+                <p className="text-gray-600 dark:text-gray-300">Cruces Ferroviarios Inteligentes</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
               <div className="text-right">
-                <p className="text-sm text-gray-500">Última actualización</p>
-                <p className="text-sm font-medium text-gray-900">{new Date().toLocaleTimeString('es-ES')}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Última actualización</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{new Date().toLocaleTimeString('es-ES')}</p>
               </div>
               <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+              <ThemeToggle />
             </div>
           </div>
         </div>
@@ -49,70 +52,70 @@ function Dashboard() {
       {/* Panel de Estadísticas */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-md p-6 fade-in">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 fade-in border dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Cruces</p>
-                <p className="text-3xl font-bold text-gray-900">{stats.totalCruces}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Cruces</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.totalCruces}</p>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
               </div>
             </div>
           </div>
           
-          <div className="bg-white rounded-xl shadow-md p-6 fade-in">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 fade-in border dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Activos</p>
-                <p className="text-3xl font-bold text-green-600">{stats.activos}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Activos</p>
+                <p className="text-3xl font-bold text-green-600 dark:text-green-400">{stats.activos}</p>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
             </div>
           </div>
           
-          <div className="bg-white rounded-xl shadow-md p-6 fade-in">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 fade-in border dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Mantenimiento</p>
-                <p className="text-3xl font-bold text-yellow-600">{stats.mantenimiento}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Mantenimiento</p>
+                <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">{stats.mantenimiento}</p>
               </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" />
                 </svg>
               </div>
             </div>
           </div>
           
-          <div className="bg-white rounded-xl shadow-md p-6 fade-in">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 fade-in border dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Inactivos</p>
-                <p className="text-3xl font-bold text-red-600">{stats.inactivos}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Inactivos</p>
+                <p className="text-3xl font-bold text-red-600 dark:text-red-400">{stats.inactivos}</p>
               </div>
-              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
             </div>
           </div>
           
-          <div className="bg-white rounded-xl shadow-md p-6 fade-in">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 fade-in border dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Alertas Batería</p>
-                <p className="text-3xl font-bold text-orange-600">{stats.alertasBateria}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Alertas Batería</p>
+                <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">{stats.alertasBateria}</p>
               </div>
-              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
@@ -121,17 +124,17 @@ function Dashboard() {
         </div>
 
         {/* Filtros y Búsqueda */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-8 fade-in">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 mb-8 fade-in border dark:border-gray-700">
           <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
             <div className="flex-1 max-w-lg">
               <div className="relative">
-                <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 <input
                   type="text"
                   placeholder="Buscar cruces por nombre..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -144,8 +147,8 @@ function Dashboard() {
                   onClick={() => setFilterStatus(status)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     filterStatus === status
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      ? 'bg-blue-600 text-white dark:bg-blue-500'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
                   }`}
                 >
                   {status}
@@ -176,11 +179,13 @@ function Dashboard() {
 
 export default function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/cruce/:id" element={<CruceDetail />} />
-      </Routes>
-    </Router>
+    <ThemeProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/cruce/:id" element={<CruceDetail />} />
+        </Routes>
+      </Router>
+    </ThemeProvider>
   )
 }

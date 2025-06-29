@@ -104,10 +104,10 @@ export function CruceDetail() {
 
   if (!cruce) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando información del cruce...</p>
+          <p className="text-gray-600 dark:text-gray-300">Cargando información del cruce...</p>
         </div>
       </div>
     );
@@ -116,20 +116,20 @@ export function CruceDetail() {
   const getEstadoStyles = (estado) => {
     switch (estado) {
       case 'ACTIVO':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900 dark:text-green-300 dark:border-green-700';
       case 'MANTENIMIENTO':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900 dark:text-yellow-300 dark:border-yellow-700';
       case 'INACTIVO':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900 dark:text-red-300 dark:border-red-700';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600';
     }
   };
 
   const getBateriaColor = (nivel) => {
-    if (nivel >= 70) return 'text-green-600';
-    if (nivel >= 30) return 'text-yellow-600';
-    return 'text-red-600';
+    if (nivel >= 70) return 'text-green-600 dark:text-green-400';
+    if (nivel >= 30) return 'text-yellow-600 dark:text-yellow-400';
+    return 'text-red-600 dark:text-red-400';
   };
 
   const formatearFecha = (fecha) => {
@@ -149,15 +149,15 @@ export function CruceDetail() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
       {/* Header */}
-      <header className="bg-white shadow-lg border-b border-gray-200">
+      <header className="bg-white dark:bg-gray-800 shadow-lg border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-6">
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => navigate('/')}
-                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -165,8 +165,8 @@ export function CruceDetail() {
                 <span>Volver</span>
               </button>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">{cruce.nombre}</h1>
-                <p className="text-gray-600">{cruce.ubicacion}</p>
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{cruce.nombre}</h1>
+                <p className="text-gray-600 dark:text-gray-300">{cruce.ubicacion}</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">

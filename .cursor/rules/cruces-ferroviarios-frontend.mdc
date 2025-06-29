@@ -1,0 +1,251 @@
+# Cursor Rules - Sistema de Monitoreo de Cruces Ferroviarios
+
+## 📋 **Descripción General del Proyecto**
+Este proyecto es la **tesis de Ingeniería en Informática** sobre un **Sistema de Monitoreo de Cruces Ferroviarios Inteligentes**.
+
+### 🎯 **Objetivo Principal**
+Automatizar la lectura de sensores (ESP32) y controlar estados del PLC (DVP28SV) para asegurar el funcionamiento seguro de los cruces ferroviarios, proporcionando monitoreo en tiempo real y alertas tempranas.
+
+## 🏗️ **Arquitectura del Sistema**
+
+### **Hardware & IoT**
+- **ESP32-WROOM-32U**: Captura datos de batería, estado de sensores y detección de pasos de tren
+- **PLC DVP28SV**: Controla barreras automáticas y señalización luminosa
+- **Integración**: ESP32 ↔ PLC vía protocolo Modbus RTU
+- **Sensores**: Proximidad, Velocidad, Peso, Estado de Barrera
+
+### **Backend & Base de Datos**
+- **Backend**: Django REST API
+- **Base de Datos**: PostgreSQL (`cruces_ferroviarios`)
+- **Tablas principales**: `cruce`, `sensor`, `registro_mantenimiento`, `historico_trafico`
+- **Endpoints API**: `/api/cruces`, `/api/sensores`, `/api/alertas`, `/api/mantenimiento`
+
+### **Frontend (React + Vite + Tailwind)**
+- **Framework**: React 18 con Vite como bundler
+- **Estilos**: Tailwind CSS v4
+- **Navegación**: React Router DOM
+- **Estado**: React Hooks (useState, useEffect)
+
+## 📁 **Estructura del Frontend**
+
+```
+src/
+├── components/
+│   ├── AlertPanel.jsx          # Panel de alertas en tiempo real
+│   ├── CrossingCard.jsx        # Tarjeta individual de cruce (navegable)
+│   ├── CrossingList.jsx        # Lista con filtros y búsqueda
+│   └── CruceDetail.jsx         # Página de detalle completa
+├── pages/                      # (Alternativa para páginas)
+├── assets/                     # Recursos estáticos
+├── App.jsx                     # Router principal y Dashboard
+├── main.jsx                    # Punto de entrada React
+└── index.css                   # Estilos globales + Tailwind
+```
+
+## 🎨 **Componentes Principales**
+
+### **App.jsx**
+- **Router principal** con BrowserRouter
+- **Dashboard**: Página principal con estadísticas generales
+- **Rutas**: `/` (dashboard) y `/cruce/:id` (detalle)
+- **Filtros**: Búsqueda y filtros por estado (ACTIVO, MANTENIMIENTO, INACTIVO)
+
+### **CrossingCard.jsx**
+- **Navegación**: Clic en tarjeta o botón "Ver detalle" → `/cruce/:id`
+- **Información mostrada**: Estado, batería, sensores, ubicación
+- **Interactividad**: Vista previa expandible, indicadores visuales de estado
+- **Props**: `id_cruce`, `nombre`, `estado`, `bateria`, `sensores`, etc.
+
+### **CruceDetail.jsx**
+- **5 Tabs de información**:
+  1. **📊 General**: Fechas, configuración técnica
+  2. **🔧 Sensores**: Estado individual de cada sensor
+  3. **🚆 Tráfico**: Historial de trenes y velocidades
+  4. **📍 Ubicación**: Coordenadas GPS y dirección
+  5. **👤 Contacto**: Responsable y datos de contacto
+- **Datos**: Información detallada con coordenadas reales de la región de Coquimbo
+
+### **AlertPanel.jsx**
+- **Alertas en tiempo real**: Batería crítica, sensores desconectados
+- **Tipos**: CRITICO, ADVERTENCIA, INFO
+- **Estado**: Leído/No leído con marcado visual
+
+### **CrossingList.jsx**
+- **8 cruces de ejemplo** con datos realistas
+- **Filtrado**: Por texto (nombre/ubicación) y estado
+- **Ordenamiento**: Cruces activos primero
+- **Estado vacío**: Mensaje cuando no hay resultados
+
+## 🔧 **Configuración Técnica**
+
+### **Dependencias Principales**
+```json
+{
+  "react": "^18.x",
+  "react-dom": "^18.x",
+  "react-router-dom": "^6.x",
+  "tailwindcss": "^4.x",
+  "vite": "^5.x"
+}
+```
+
+### **Archivos de Configuración**
+- **vite.config.js**: Configuración de Vite con Tailwind
+- **index.html**: HTML base con meta tags SEO
+- **package.json**: Scripts y dependencias
+- **.gitignore**: Archivos excluidos del control de versiones
+
+## 📊 **Estructura de Datos**
+
+### **Modelo de Cruce**
+```javascript
+{
+  id_cruce: number,
+  nombre: string,
+  estado: 'ACTIVO' | 'MANTENIMIENTO' | 'INACTIVO',
+  bateria: number, // Porcentaje 0-100
+  sensoresActivos: number, // Cantidad activa de 4
+  ubicacion: string, // Dirección completa
+  ultimaActividad: string, // ISO Date
+  tipoTren: 'Carga' | 'Pasajeros' | 'Mixto',
+  velocidadPromedio: number, // km/h
+  coordenadas: {
+    latitud: number,
+    longitud: number
+  },
+  instalacion: string, // Fecha ISO
+  ultimoMantenimiento: string,
+  proximoMantenimiento: string,
+  historicoTrafico: Array<{
+    fecha: string,
+    trenes: number,
+    velocidadMax: number
+  }>,
+  sensores: Array<{
+    id: number,
+    tipo: string,
+    estado: string,
+    ubicacion: string
+  }>,
+  configuracion: {
+    tiempoAlerta: number, // segundos
+    velocidadMaxima: number, // km/h
+    tiempoBarrera: number, // segundos
+    modoOperacion: 'Automático' | 'Manual'
+  },
+  contacto: {
+    responsable: string,
+    telefono: string,
+    email: string
+  }
+}
+```
+
+## 🎯 **Funcionalidades Implementadas**
+
+### **Dashboard Principal**
+- **Estadísticas generales**: Total cruces, activos, en mantenimiento, inactivos, alertas de batería
+- **Búsqueda inteligente**: Por nombre de cruce o ubicación
+- **Filtros dinámicos**: Por estado con contadores actualizados
+- **Tiempo real**: Indicador de conexión y última actualización
+
+### **Sistema de Navegación**
+- **Navegación fluida**: React Router con rutas dinámicas
+- **Breadcrumbs**: Botón "Volver" en páginas de detalle
+- **Deep linking**: URLs directas a cruces específicos (`/cruce/1`)
+- **Responsive**: Adaptado a dispositivos móviles y desktop
+
+### **Alertas y Notificaciones**
+- **Panel lateral**: Alertas críticas, advertencias e información
+- **Priorización**: Alertas críticas primero
+- **Estados visuales**: Colores diferenciados por tipo y estado de lectura
+- **Timestamps**: Marcas de tiempo de cada alerta
+
+## 🌍 **Datos Geográficos**
+- **Región**: Coquimbo, Chile
+- **Coordenadas reales**: Latitudes y longitudes precisas
+- **Ubicaciones**: Km específicos en rutas 5 Norte, 43, 41, 31
+- **Cruces incluidos**: La Serena, Coquimbo, Ovalle, Vicuña, Illapel, Los Vilos, Salamanca, Combarbalá
+
+## 🔄 **Flujo de Datos**
+```
+ESP32 → Django API → PostgreSQL → React Frontend
+  ↓         ↓           ↓             ↓
+Sensores → Endpoints → Base Datos → Componentes UI
+```
+
+## 🎨 **Patrones de Diseño UI**
+
+### **Colores por Estado**
+- **Verde**: Activo, batería >70%, sensores operativos
+- **Amarillo**: Mantenimiento, batería 30-70%, advertencias
+- **Rojo**: Inactivo, batería <30%, errores críticos
+- **Azul**: Elementos de navegación e interacción
+
+### **Componentes Reutilizables**
+- **Tarjetas**: Sombras, bordes redondeados, hover effects
+- **Botones**: Estados hover, loading, disabled
+- **Iconos**: SVG inline para mejor rendimiento
+- **Indicadores**: Barras de progreso, badges de estado
+
+## 📝 **Convenciones de Código**
+
+### **Nomenclatura**
+- **Componentes**: PascalCase (`CrossingCard.jsx`)
+- **Funciones**: camelCase (`getEstadoStyles`)
+- **Variables**: camelCase (`crucesDetallados`)
+- **CSS Classes**: kebab-case (siguiendo Tailwind)
+
+### **Estructura de Archivos**
+- **Componentes** en `src/components/`
+- **Páginas** opcionales en `src/pages/`
+- **Hooks personalizados**: `useFetchCruces()` (futuro)
+- **Utils**: Funciones de formateo y validación
+- **Assets**: Imágenes y recursos estáticos
+
+### **Props y State**
+- **Props explícitas**: Destructuring en parámetros
+- **Estado local**: useState para componentes simples
+- **Efectos**: useEffect para ciclo de vida
+- **Navegación**: useNavigate y useParams de React Router
+
+## 🔮 **Próximas Implementaciones**
+- **Conexión real con API Django**
+- **WebSockets para actualizaciones en tiempo real**
+- **Mapas interactivos** con coordenadas GPS
+- **Gráficos de rendimiento** y estadísticas históricas
+- **Sistema de autenticación** y roles de usuario
+- **Exportación de reportes** en PDF/Excel
+- **Configuración de alertas personalizadas**
+
+## 💡 **Notas para Desarrollo**
+- **Responsivo first**: Diseño mobile-first con Tailwind
+- **Accesibilidad**: ARIA labels y navegación por teclado
+- **Performance**: Lazy loading y code splitting
+- **SEO**: Meta tags y structured data
+- **Testing**: Preparado para Jest y React Testing Library
+- **Deployment**: Configurado para Vercel/Netlify
+
+## 🚀 **Comandos Útiles**
+```bash
+# Desarrollo
+npm run dev          # Servidor de desarrollo
+npm run build        # Build para producción
+npm run preview      # Preview del build
+
+# Instalación de dependencias
+npm install react-router-dom  # Navegación
+npm install @types/react       # TypeScript support (futuro)
+```
+
+## 📱 **URLs y Rutas**
+- **Dashboard**: `/` - Página principal con lista de cruces
+- **Detalle de cruce**: `/cruce/:id` - Página de información completa
+- **Ejemplo**: `/cruce/1` - Detalle del Cruce La Serena
+
+## 🔧 **Variables de Estado Importantes**
+- **Estados de cruces**: `ACTIVO`, `MANTENIMIENTO`, `INACTIVO`
+- **Tipos de tren**: `Carga`, `Pasajeros`, `Mixto`
+- **Tipos de sensor**: `Proximidad`, `Velocidad`, `Peso`, `Barrera`
+- **Tipos de alerta**: `CRITICO`, `ADVERTENCIA`, `INFO`
+- **Modos de operación**: `Automático`, `Manual` 
