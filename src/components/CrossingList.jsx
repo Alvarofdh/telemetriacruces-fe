@@ -149,6 +149,7 @@ export function CrossingList({ searchTerm, filterStatus }) {
               style={{ animationDelay: `${index * 0.1}s` }}
             >
               <CrossingCard
+                id_cruce={cruce.id_cruce}
                 nombre={cruce.nombre}
                 estado={cruce.estado}
                 bateria={cruce.bateria}

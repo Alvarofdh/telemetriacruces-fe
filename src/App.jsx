@@ -1,9 +1,11 @@
 // src/App.jsx
 import React, { useState } from 'react'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { CrossingList } from './components/CrossingList'
 import { AlertPanel } from './components/AlertPanel'
+import { CruceDetail } from './components/CruceDetail'
 
-export default function App() {
+function Dashboard() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('TODOS')
 
@@ -169,5 +171,16 @@ export default function App() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/cruce/:id" element={<CruceDetail />} />
+      </Routes>
+    </Router>
   )
 }
