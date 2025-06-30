@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useData } from '../contexts/DataContext';
 
-// Datos ampliados de los cruces con información detallada
-const crucesDetallados = {
+// Datos históricos de ejemplo que podrían venir de una API
+const datosHistoricos = {
   1: {
     id_cruce: 1,
     nombre: 'Cruce La Serena',
@@ -13,13 +14,6 @@ const crucesDetallados = {
     ultimaActividad: '2024-01-15 08:30',
     tipoTren: 'Carga',
     velocidadPromedio: 65,
-    coordenadas: {
-      latitud: -29.9027,
-      longitud: -71.2495
-    },
-    instalacion: '2022-03-15',
-    ultimoMantenimiento: '2024-01-10',
-    proximoMantenimiento: '2024-02-10',
     historicoTrafico: [
       { fecha: '2024-01-15', trenes: 12, velocidadMax: 75 },
       { fecha: '2024-01-14', trenes: 8, velocidadMax: 70 },
@@ -27,6 +21,7 @@ const crucesDetallados = {
       { fecha: '2024-01-12', trenes: 10, velocidadMax: 65 },
       { fecha: '2024-01-11', trenes: 14, velocidadMax: 72 }
     ],
+    proximoMantenimiento: '2024-02-10',
     sensores: [
       { id: 1, tipo: 'Proximidad', estado: 'ACTIVO', ubicacion: 'Norte' },
       { id: 2, tipo: 'Velocidad', estado: 'ACTIVO', ubicacion: 'Centro' },
@@ -38,11 +33,6 @@ const crucesDetallados = {
       velocidadMaxima: 80,
       tiempoBarrera: 15,
       modoOperacion: 'Automático'
-    },
-    contacto: {
-      responsable: 'Juan Pérez',
-      telefono: '+56 9 8765 4321',
-      email: 'juan.perez@ferrocarriles.cl'
     }
   },
   2: {
@@ -92,15 +82,18 @@ const crucesDetallados = {
 export function CruceDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { cruces } = useData();
   const [cruce, setCruce] = useState(null);
   const [activeTab, setActiveTab] = useState('general');
 
   useEffect(() => {
-    const cruceData = crucesDetallados[parseInt(id)];
+    const cruceData = cruces.find(c => c.id_cruce === parseInt(id));
     if (cruceData) {
-      setCruce(cruceData);
+      // Combinar datos del contexto con datos históricos si existen
+      const datosExtra = datosHistoricos[parseInt(id)] || {};
+      setCruce({ ...cruceData, ...datosExtra });
     }
-  }, [id]);
+  }, [id, cruces]);
 
   if (!cruce) {
     return (

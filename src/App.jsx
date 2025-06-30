@@ -2,23 +2,18 @@
 import React, { useState } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { ThemeProvider } from './contexts/ThemeContext'
+import { DataProvider, useData } from './contexts/DataContext'
 import { CrossingList } from './components/CrossingList'
 import { AlertPanel } from './components/AlertPanel'
 import { CruceDetail } from './components/CruceDetail'
 import { ThemeToggle } from './components/ThemeToggle'
+import { AdminDashboard } from './components/AdminDashboard'
+import { LoginPage } from './components/LoginPage'
 
 function Dashboard() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('TODOS')
-
-  // Datos de estadísticas generales (estos podrían venir de una API)
-  const stats = {
-    totalCruces: 24,
-    activos: 18,
-    mantenimiento: 4,
-    inactivos: 2,
-    alertasBateria: 3
-  }
+  const { stats } = useData()
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
@@ -37,14 +32,20 @@ function Dashboard() {
                 <p className="text-gray-600 dark:text-gray-300">Cruces Ferroviarios Inteligentes</p>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <p className="text-sm text-gray-500 dark:text-gray-400">Última actualización</p>
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{new Date().toLocaleTimeString('es-ES')}</p>
-              </div>
-              <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-              <ThemeToggle />
+                      <div className="flex items-center space-x-4">
+            <div className="text-right">
+              <p className="text-sm text-gray-500 dark:text-gray-400">Última actualización</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{new Date().toLocaleTimeString('es-ES')}</p>
             </div>
+            <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+            <a
+              href="/admin"
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 transition-colors text-sm"
+            >
+              Admin
+            </a>
+            <ThemeToggle />
+          </div>
           </div>
         </div>
       </header>
@@ -177,15 +178,31 @@ function Dashboard() {
   )
 }
 
+function AppContent() {
+  const { user, isAdmin } = useData()
+
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/cruce/:id" element={<CruceDetail />} />
+        <Route 
+          path="/admin" 
+          element={
+            user && isAdmin ? <AdminDashboard /> : <LoginPage />
+          } 
+        />
+      </Routes>
+    </Router>
+  )
+}
+
 export default function App() {
   return (
     <ThemeProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/cruce/:id" element={<CruceDetail />} />
-        </Routes>
-      </Router>
+      <DataProvider>
+        <AppContent />
+      </DataProvider>
     </ThemeProvider>
   )
 }
