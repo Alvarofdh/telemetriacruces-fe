@@ -5,6 +5,8 @@ import { UserManagement } from './admin/UserManagement'
 import { SystemLogs } from './admin/SystemLogs'
 import { SystemConfig } from './admin/SystemConfig'
 import { AnalyticsPanel } from './admin/AnalyticsPanel'
+import { MapView } from './MapView'
+import { ChartsPanel } from './ChartsPanel'
 
 export function AdminDashboard() {
   const { stats, user, logout } = useData()
@@ -14,6 +16,8 @@ export function AdminDashboard() {
     { id: 'overview', label: 'Resumen General', icon: 'chart' },
     { id: 'cruces', label: 'Gestión de Cruces', icon: 'location' },
     { id: 'usuarios', label: 'Gestión de Usuarios', icon: 'users' },
+    { id: 'map', label: 'Mapa Interactivo', icon: 'map' },
+    { id: 'charts', label: 'Gráficos Avanzados', icon: 'barChart' },
     { id: 'analytics', label: 'Análisis y Reportes', icon: 'analytics' },
     { id: 'logs', label: 'Logs del Sistema', icon: 'list' },
     { id: 'config', label: 'Configuración', icon: 'settings' }
@@ -51,6 +55,16 @@ export function AdminDashboard() {
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      ),
+      map: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+        </svg>
+      ),
+      barChart: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
         </svg>
       )
     }
@@ -156,10 +170,16 @@ export function AdminDashboard() {
               + Agregar Usuario
             </button>
             <button 
-              onClick={() => setActiveTab('analytics')}
+              onClick={() => setActiveTab('map')}
               className="w-full text-left px-4 py-2 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
             >
-              📊 Ver Reportes
+              🗺️ Ver Mapa Interactivo
+            </button>
+            <button 
+              onClick={() => setActiveTab('charts')}
+              className="w-full text-left px-4 py-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors"
+            >
+              📊 Gráficos Avanzados
             </button>
           </div>
         </div>
@@ -193,6 +213,10 @@ export function AdminDashboard() {
         return <CruceManagement />
       case 'usuarios':
         return <UserManagement />
+      case 'map':
+        return <MapView />
+      case 'charts':
+        return <ChartsPanel />
       case 'analytics':
         return <AnalyticsPanel />
       case 'logs':
