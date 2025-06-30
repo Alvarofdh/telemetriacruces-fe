@@ -68,7 +68,7 @@ src/
 1. **Clonar el repositorio**
 ```bash
 git clone [url-del-repositorio]
-cd cruces-ferroviarios-fe
+cd telemetriacruces-fe
 ```
 
 2. **Instalar dependencias**
