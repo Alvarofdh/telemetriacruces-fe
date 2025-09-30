@@ -3,21 +3,11 @@ import React from 'react'
 import { CrossingCard } from './Crossingcard'
 import { useData } from '../contexts/DataContext'
 
-export function CrossingList({ searchTerm, filterStatus }) {
+export function CrossingList() {
   const { cruces } = useData()
-  
-  // Filtrar cruces basado en búsqueda y estado
-  const filteredCruces = cruces.filter(cruce => {
-    const matchesSearch = cruce.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         cruce.ubicacion.toLowerCase().includes(searchTerm.toLowerCase())
-    
-    const matchesFilter = filterStatus === 'TODOS' || cruce.estado === filterStatus
-    
-    return matchesSearch && matchesFilter
-  })
 
   // Ordenar por estado (activos primero) y luego por nombre
-  const sortedCruces = [...filteredCruces].sort((a, b) => {
+  const sortedCruces = [...cruces].sort((a, b) => {
     if (a.estado === 'ACTIVO' && b.estado !== 'ACTIVO') return -1
     if (a.estado !== 'ACTIVO' && b.estado === 'ACTIVO') return 1
     return a.nombre.localeCompare(b.nombre)
@@ -32,9 +22,7 @@ export function CrossingList({ searchTerm, filterStatus }) {
             Cruces Ferroviarios
           </h2>
           <p className="text-gray-600 dark:text-gray-300 mt-1">
-            Mostrando {filteredCruces.length} de {cruces.length} cruces
-            {searchTerm && ` para "${searchTerm}"`}
-            {filterStatus !== 'TODOS' && ` con estado ${filterStatus}`}
+            Mostrando {sortedCruces.length} cruces en total
           </p>
         </div>
         

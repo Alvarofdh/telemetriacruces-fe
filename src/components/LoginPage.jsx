@@ -1,31 +1,36 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useData } from '../contexts/DataContext'
 
 export function LoginPage() {
-  const { login } = useData()
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  })
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+	const { login } = useData()
+	const navigate = useNavigate()
+	const [formData, setFormData] = useState({
+		email: '',
+		password: ''
+	})
+	const [error, setError] = useState('')
+	const [loading, setLoading] = useState(false)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
+	const handleSubmit = async (e) => {
+		e.preventDefault()
+		setLoading(true)
+		setError('')
 
-    try {
-      const success = login(formData.email, formData.password)
-      if (!success) {
-        setError('Credenciales inválidas. Usa admin@cruces-ferro.cl / admin123')
-      }
-    } catch {
-      setError('Error al iniciar sesión')
-    } finally {
-      setLoading(false)
-    }
-  }
+		try {
+			const success = login(formData.email, formData.password)
+			if (success) {
+				// Redirigir al dashboard después de login exitoso
+				navigate('/')
+			} else {
+				setError('Credenciales inválidas. Usa admin@cruces-ferro.cl / admin123')
+			}
+		} catch {
+			setError('Error al iniciar sesión')
+		} finally {
+			setLoading(false)
+		}
+	}
 
   const demoCredentials = [
     { email: 'admin@cruces-ferro.cl', rol: 'SUPER_ADMIN' },

@@ -1,10 +1,12 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useData } from '../../contexts/DataContext'
 
 export function SystemConfig() {
-  const { configuracion, setConfiguracion } = useData()
-  const [config, setConfig] = useState(configuracion)
-  const [unsavedChanges, setUnsavedChanges] = useState(false)
+	const navigate = useNavigate()
+	const { configuracion, setConfiguracion } = useData()
+	const [config, setConfig] = useState(configuracion)
+	const [unsavedChanges, setUnsavedChanges] = useState(false)
 
   const handleChange = (key, value) => {
     setConfig({ ...config, [key]: value })
@@ -22,12 +24,23 @@ export function SystemConfig() {
     setUnsavedChanges(false)
   }
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Configuración del Sistema</h2>
-        <div className="flex space-x-4">
+	return (
+		<div className="space-y-6">
+			{/* Header */}
+			<div className="flex justify-between items-center">
+				<div className="flex items-center space-x-4">
+					<button
+						onClick={() => navigate('/admin')}
+						className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 dark:bg-gray-500 dark:hover:bg-gray-600 transition-colors"
+					>
+						<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+						</svg>
+						<span>Volver</span>
+					</button>
+					<h2 className="text-3xl font-bold text-gray-900 dark:text-white">Configuración del Sistema</h2>
+				</div>
+				<div className="flex space-x-4">
           {unsavedChanges && (
             <button
               onClick={handleReset}

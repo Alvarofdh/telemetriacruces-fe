@@ -1,6 +1,7 @@
 // src/App.jsx
-import React, { useState } from 'react'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import React from 'react'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { Toaster } from 'react-hot-toast'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { DataProvider, useData } from './contexts/DataContext'
 import { CrossingList } from './components/CrossingList'
@@ -10,10 +11,25 @@ import { ThemeToggle } from './components/ThemeToggle'
 import { AdminDashboard } from './components/AdminDashboard'
 import { LoginPage } from './components/LoginPage'
 
+// Componente para proteger rutas
+function ProtectedRoute({ children }) {
+	const { user } = useData()
+	
+	if (!user) {
+		return <Navigate to="/login" replace />
+	}
+	
+	return children
+}
+
 function Dashboard() {
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterStatus, setFilterStatus] = useState('TODOS')
-  const { stats } = useData()
+	const { stats, logout, user, isESP32Connected, lastUpdate } = useData()
+
+	const handleLogout = () => {
+		if (window.confirm('¿Estás seguro de que deseas cerrar sesión?')) {
+			logout()
+		}
+	}
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
@@ -32,27 +48,48 @@ function Dashboard() {
                 <p className="text-gray-600 dark:text-gray-300">Cruces Ferroviarios Inteligentes</p>
               </div>
             </div>
-                      <div className="flex items-center space-x-4">
-            <div className="text-right">
-              <p className="text-sm text-gray-500 dark:text-gray-400">Última actualización</p>
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{new Date().toLocaleTimeString('es-ES')}</p>
-            </div>
-            <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-            <a
-              href="/admin"
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 transition-colors text-sm"
-            >
-              Admin
-            </a>
-            <ThemeToggle />
-          </div>
+						<div className="flex items-center space-x-4">
+							{/* Estado de conexión ESP32 */}
+							<div className="text-right">
+								<p className="text-sm text-gray-500 dark:text-gray-400">
+									{isESP32Connected ? 'ESP32 Conectado' : 'Datos de Respaldo'}
+								</p>
+								<p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+									{lastUpdate ? lastUpdate.toLocaleTimeString('es-ES') : 'Sin datos'}
+								</p>
+							</div>
+							<div className={`w-3 h-3 rounded-full ${isESP32Connected ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}></div>
+							
+							{/* Usuario */}
+							<div className="text-right border-l pl-4 border-gray-200 dark:border-gray-600">
+								<p className="text-sm text-gray-500 dark:text-gray-400">Usuario</p>
+								<p className="text-sm font-medium text-gray-900 dark:text-gray-100">{user?.nombre || 'Invitado'}</p>
+							</div>
+							
+							<a
+								href="/admin"
+								className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 transition-colors text-sm"
+							>
+								Admin
+							</a>
+							
+							<button
+								onClick={handleLogout}
+								className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 dark:bg-gray-500 dark:hover:bg-gray-600 transition-colors text-sm"
+								title="Cerrar sesión"
+							>
+								Salir
+							</button>
+							
+							<ThemeToggle />
+						</div>
           </div>
         </div>
       </header>
 
-      {/* Panel de Estadísticas */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+			{/* Panel de Estadísticas */}
+			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 fade-in border dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
@@ -121,88 +158,103 @@ function Dashboard() {
                 </svg>
               </div>
             </div>
-          </div>
-        </div>
+					</div>
+				</div>
 
-        {/* Filtros y Búsqueda */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 mb-8 fade-in border dark:border-gray-700">
-          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-            <div className="flex-1 max-w-lg">
-              <div className="relative">
-                <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <input
-                  type="text"
-                  placeholder="Buscar cruces por nombre..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              {['TODOS', 'ACTIVO', 'MANTENIMIENTO', 'INACTIVO'].map((status) => (
-                <button
-                  key={status}
-                  onClick={() => setFilterStatus(status)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    filterStatus === status
-                      ? 'bg-blue-600 text-white dark:bg-blue-500'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-                  }`}
-                >
-                  {status}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Contenido Principal */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Lista de Cruces - Columna principal */}
-          <main className="lg:col-span-3 fade-in">
-            <CrossingList searchTerm={searchTerm} filterStatus={filterStatus} />
-          </main>
+				{/* Contenido Principal */}
+				<div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+					{/* Lista de Cruces - Columna principal */}
+					<main className="lg:col-span-3 fade-in">
+						<CrossingList />
+					</main>
           
           {/* Panel de Alertas - Sidebar */}
           <aside className="lg:col-span-1 fade-in" style={{ animationDelay: '0.2s' }}>
             <div className="sticky top-8">
               <AlertPanel />
             </div>
-          </aside>
-        </div>
-      </div>
-    </div>
-  )
+					</aside>
+				</div>
+			</div>
+		</div>
+	)
 }
 
 function AppContent() {
-  const { user, isAdmin } = useData()
+	const { user, isAdmin } = useData()
 
-  return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/cruce/:id" element={<CruceDetail />} />
-        <Route 
-          path="/admin" 
-          element={
-            user && isAdmin ? <AdminDashboard /> : <LoginPage />
-          } 
-        />
-      </Routes>
-    </Router>
-  )
+	return (
+		<Router>
+			<Routes>
+				{/* Ruta de login - pública */}
+				<Route 
+					path="/login" 
+					element={user ? <Navigate to="/" replace /> : <LoginPage />} 
+				/>
+				
+				{/* Rutas protegidas - requieren autenticación */}
+				<Route 
+					path="/" 
+					element={
+						<ProtectedRoute>
+							<Dashboard />
+						</ProtectedRoute>
+					} 
+				/>
+				<Route 
+					path="/cruce/:id" 
+					element={
+						<ProtectedRoute>
+							<CruceDetail />
+						</ProtectedRoute>
+					} 
+				/>
+				<Route 
+					path="/admin" 
+					element={
+						<ProtectedRoute>
+							{user && isAdmin ? <AdminDashboard /> : <Navigate to="/" replace />}
+						</ProtectedRoute>
+					} 
+				/>
+				
+				{/* Ruta por defecto - redirige a login */}
+				<Route path="*" element={<Navigate to={user ? "/" : "/login"} replace />} />
+			</Routes>
+		</Router>
+	)
 }
 
 export default function App() {
-  return (
-    <ThemeProvider>
-      <DataProvider>
-        <AppContent />
-      </DataProvider>
-    </ThemeProvider>
-  )
+	return (
+		<ThemeProvider>
+			<DataProvider>
+				<Toaster
+					position="top-right"
+					toastOptions={{
+						duration: 4000,
+						style: {
+							background: '#363636',
+							color: '#fff',
+						},
+						success: {
+							duration: 3000,
+							iconTheme: {
+								primary: '#22c55e',
+								secondary: '#fff',
+							},
+						},
+						error: {
+							duration: 4000,
+							iconTheme: {
+								primary: '#ef4444',
+								secondary: '#fff',
+							},
+						},
+					}}
+				/>
+				<AppContent />
+			</DataProvider>
+		</ThemeProvider>
+	)
 }
