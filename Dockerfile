@@ -1,6 +1,3 @@
-# Dockerfile para Viametrica Frontend
-# Optimizado para producción con Caprover
-
 # Etapa 1: Build
 FROM node:20-alpine AS builder
 
