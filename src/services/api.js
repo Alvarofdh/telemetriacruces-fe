@@ -1,10 +1,19 @@
 // Configuración de la API del ESP32
 const API_CONFIG = {
-	// Cambia esta URL por la IP de tu ESP32 cuando lo conectes
-	// Ejemplo: 'http://192.168.1.100' o 'http://viametrica.local'
-	BASE_URL: 'http://viametrica.local',
-	// BASE_URL: 'http://192.168.1.100', // Descomenta y usa la IP si mDNS no funciona
-	TIMEOUT: 5000,
+	// Usa variables de entorno para configuración flexible entre ambientes
+	BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://viametrica.local',
+	TIMEOUT: parseInt(import.meta.env.VITE_API_TIMEOUT) || 5000,
+	DEBUG: import.meta.env.VITE_DEBUG_MODE === 'true',
+}
+
+// Log de configuración en modo debug
+if (API_CONFIG.DEBUG) {
+	console.log('🔧 API Configuration:', {
+		BASE_URL: API_CONFIG.BASE_URL,
+		TIMEOUT: API_CONFIG.TIMEOUT,
+		ENV: import.meta.env.VITE_APP_ENV,
+		VERSION: import.meta.env.VITE_APP_VERSION,
+	})
 }
 
 // Función para hacer peticiones HTTP con timeout

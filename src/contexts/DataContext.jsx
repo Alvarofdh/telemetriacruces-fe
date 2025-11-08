@@ -3,6 +3,7 @@ import { fetchAllTelemetry, checkHealth } from '../services/api'
 
 const DataContext = createContext()
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useData = () => {
 	const context = useContext(DataContext)
 	if (!context) {
@@ -275,6 +276,7 @@ export function DataProvider({ children }) {
 		}, 5000)
 
 		return () => clearInterval(interval)
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [])
 
 	// Funciones CRUD para cruces

@@ -1,13 +1,20 @@
 {
-  "name": "cruces-ferroviarios-fe",
+  "name": "viametrica",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:production": "NODE_ENV=production vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "preview:production": "vite preview --port 8080",
+    "clean": "rm -rf dist node_modules/.vite",
+    "deploy:caprover": "caprover deploy",
+    "check": "npm run lint && npm run build",
+    "pre-deploy": "bash scripts/pre-deploy-check.sh",
+    "deploy": "npm run pre-deploy && npm run deploy:caprover"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.11",

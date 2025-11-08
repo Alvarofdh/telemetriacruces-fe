@@ -62,7 +62,7 @@ export function AnalyticsPanel() {
             <span className="font-semibold text-yellow-600">{bateriaStats.media} cruces</span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600 dark:text-gray-400">Alta (>80%)</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">Alta (&gt;80%)</span>
             <span className="font-semibold text-green-600">{bateriaStats.alta} cruces</span>
           </div>
         </div>

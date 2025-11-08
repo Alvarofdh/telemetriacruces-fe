@@ -7,10 +7,20 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencias
 node_modules
+
+# Build
 dist
 dist-ssr
 *.local
+
+# Variables de entorno (IMPORTANTE: proteger claves privadas)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # Editor directories and files
 .vscode/*
@@ -22,3 +32,21 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+*~
+
+# Cursor
+.cursor
+
+# Testing
+coverage
+.nyc_output
+
+# Archivos temporales
+*.tmp
+*.temp
+.cache
+
+# Sistema operativo
+Thumbs.db
+.Spotlight-V100
+.Trashes
