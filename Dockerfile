@@ -16,13 +16,13 @@ RUN npm ci
 # Copiar el resto del código
 COPY . .
 
-# Argumentos de build con valores por defecto
-ARG VITE_API_BASE_URL=https://viametrica-be.psicosiodev.me
-ARG VITE_API_TIMEOUT=10000
+# Argumentos de build (se pasan desde Caprover como variables de entorno)
+ARG VITE_API_BASE_URL
+ARG VITE_API_TIMEOUT=5000
 ARG VITE_APP_ENV=production
 ARG VITE_APP_NAME=Viametrica
 ARG VITE_APP_VERSION=1.0.0
-ARG VITE_DEBUG_MODE=true
+ARG VITE_DEBUG_MODE=false
 ARG VITE_MAP_TILE_URL=https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png
 ARG VITE_REFRESH_INTERVAL=30000
 
@@ -60,7 +60,7 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Verificar que los archivos se copiaron
 RUN ls -la /usr/share/nginx/html && \
-    echo "✅ Files copied to nginx successfully!"
+    echo "Files copied to nginx successfully!"
 
 # Exponer puerto 80
 EXPOSE 80
