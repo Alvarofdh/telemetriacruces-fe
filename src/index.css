@@ -92,4 +92,27 @@
 .status-inactive::before {
   background-color: #ef4444;
   box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+}
+
+/* Estilos para Leaflet */
+@import 'leaflet/dist/leaflet.css';
+
+/* Corrección para marcadores personalizados de Leaflet */
+.custom-marker {
+  background: none !important;
+  border: none !important;
+}
+
+/* Ajustes para el mapa en modo oscuro */
+.dark .leaflet-container {
+  filter: brightness(0.9) contrast(1.1);
+}
+
+.dark .leaflet-popup-content-wrapper {
+  background-color: #374151 !important;
+  color: #f3f4f6 !important;
+}
+
+.dark .leaflet-popup-tip {
+  background-color: #374151 !important;
 } 

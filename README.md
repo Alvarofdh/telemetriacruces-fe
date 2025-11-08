@@ -1,4 +1,4 @@
-# 🚆 Sistema de Monitoreo de Cruces Ferroviarios
+# 🚆 Viametrica - Sistema de Monitoreo de Cruces Ferroviarios
 
 Sistema web moderno para el monitoreo en tiempo real de cruces ferroviarios inteligentes, desarrollado con React + Vite y Tailwind CSS.
 
@@ -60,8 +60,9 @@ src/
 ## 🚀 Instalación y Configuración
 
 ### Prerrequisitos
-- Node.js (versión 16 o superior)
+- Node.js (versión 18 o superior)
 - npm o yarn
+- Git
 
 ### Pasos de instalación
 
@@ -76,20 +77,36 @@ cd telemetriacruces-fe
 npm install
 ```
 
-3. **Ejecutar en modo desarrollo**
+3. **Configurar variables de entorno**
+```bash
+cp .env.example .env
+# Edita .env con tus configuraciones
+```
+
+Variables de entorno disponibles:
+- `VITE_API_BASE_URL`: URL de la API del ESP32
+- `VITE_API_TIMEOUT`: Timeout para peticiones (ms)
+- `VITE_DEBUG_MODE`: Habilitar logs de debug
+- Ver `.env.example` para todas las opciones
+
+4. **Ejecutar en modo desarrollo**
 ```bash
 npm run dev
 ```
 
-4. **Construir para producción**
+5. **Construir para producción**
 ```bash
 npm run build
 ```
 
-5. **Previsualizar la construcción**
+6. **Previsualizar la construcción**
 ```bash
 npm run preview
 ```
+
+### 🐳 Despliegue con Docker/Caprover
+
+Ver la guía completa en [DEPLOY.md](./DEPLOY.md) para instrucciones detalladas de despliegue en producción.
 
 ## 📱 Funcionalidades del Sistema
 
@@ -132,10 +149,15 @@ npm run preview
 ## 🔧 Scripts Disponibles
 
 ```bash
-npm run dev      # Servidor de desarrollo
-npm run build    # Construcción para producción
-npm run preview  # Previsualizar construcción
-npm run lint     # Linter de código
+npm run dev                  # Servidor de desarrollo
+npm run build                # Construcción para producción
+npm run build:production     # Build optimizado para producción
+npm run preview              # Previsualizar construcción
+npm run preview:production   # Preview en puerto 8080
+npm run lint                 # Linter de código
+npm run clean                # Limpiar archivos de build
+npm run deploy:caprover      # Desplegar a Caprover
+npm run check                # Verificar linting y build
 ```
 
 ## 🌐 Configuración de Vite
@@ -158,12 +180,40 @@ El sistema incluye datos de ejemplo para 8 cruces ferroviarios:
 - Cruce Salamanca
 - Cruce Combarbalá
 
-## 🔮 Próximas Características
+## 📚 Documentación Adicional
 
-- Integración con API backend
-- Mapas interactivos con ubicación de cruces
-- Gráficos de estadísticas históricas
-- Sistema de usuarios y autenticación
-- Notificaciones push en tiempo real
-- Exportación de reportes en PDF
+- [DEPLOY.md](./DEPLOY.md) - Guía completa de despliegue en producción
+- [SECURITY.md](./SECURITY.md) - Mejores prácticas de seguridad
+- [CONTRIBUTING.md](./CONTRIBUTING.md) - Guía para contribuidores
+- [CHANGELOG.md](./CHANGELOG.md) - Historial de cambios
+- [README_ADMIN.md](./README_ADMIN.md) - Documentación del panel de administración
+
+## 🔒 Seguridad
+
+Este proyecto implementa las siguientes medidas de seguridad:
+- Variables de entorno para datos sensibles
+- Headers de seguridad en Nginx
+- HTTPS en producción
+- Protección contra XSS y CSRF
+- Credenciales configurables
+
+Ver [SECURITY.md](./SECURITY.md) para más detalles.
+
+## 🤝 Contribuir
+
+¡Las contribuciones son bienvenidas! Por favor lee [CONTRIBUTING.md](./CONTRIBUTING.md) para conocer el proceso.
+
+## 📄 Licencia
+
+Este proyecto es de código cerrado y propiedad de [Tu Organización].
+
+## 👥 Equipo
+
+Desarrollado por Viametrica para el monitoreo inteligente de cruces ferroviarios.
+
+## 📞 Soporte
+
+Para soporte técnico o reportar problemas:
+- Abre un issue en GitHub
+- Contacta al equipo de desarrollo
 
