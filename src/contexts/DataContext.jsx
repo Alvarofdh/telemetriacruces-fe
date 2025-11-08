@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { fetchAllTelemetry, checkHealth } from '../services/api'
 
 const DataContext = createContext()
@@ -243,6 +243,10 @@ export function DataProvider({ children }) {
 		mantenimiento_programado: '02:00'
 	})
 
+	// Rate limiting para logs de error (evitar saturar la consola)
+	const lastErrorLogTime = useRef(0)
+	const ERROR_LOG_INTERVAL = 30000 // Solo loguear errores cada 30 segundos
+
 	// Función para cargar datos del ESP32
 	const loadESP32Data = async () => {
 		setIsLoading(true)
@@ -256,12 +260,24 @@ export function DataProvider({ children }) {
 			setCruces(telemetryData)
 			setLastUpdate(new Date())
 			
-			console.log('Datos del ESP32 cargados exitosamente:', telemetryData)
+			// Solo loguear éxito en modo debug
+			if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+				console.log('✅ Datos del ESP32 cargados exitosamente')
+			}
 		} catch (err) {
-			console.error('Error al conectar con ESP32, usando datos de respaldo:', err)
 			setIsESP32Connected(false)
 			setError('No se pudo conectar con el ESP32. Usando datos de respaldo.')
 			setCruces(crucesBackup)
+			
+			// Rate limiting: solo loguear errores cada 30 segundos
+			const now = Date.now()
+			if (now - lastErrorLogTime.current > ERROR_LOG_INTERVAL) {
+				const debugMode = import.meta.env.VITE_DEBUG_MODE === 'true'
+				if (debugMode) {
+					console.warn('⚠️ No se pudo conectar con el ESP32. Usando datos de respaldo.')
+				}
+				lastErrorLogTime.current = now
+			}
 		} finally {
 			setIsLoading(false)
 		}

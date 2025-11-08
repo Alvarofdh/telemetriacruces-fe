@@ -117,7 +117,10 @@ export const fetchCruces = async () => {
 			}
 		})
 	} catch (error) {
-		console.error('Error al obtener cruces del ESP32:', error)
+		// Solo loguear errores en modo debug para no saturar la consola
+		if (API_CONFIG.DEBUG) {
+			console.error('Error al obtener cruces del ESP32:', error)
+		}
 		throw error
 	}
 }
@@ -161,7 +164,10 @@ export const fetchTelemetry = async (crossingId) => {
 			velocidadPromedio: telemetry.barrier_state === 'MOVING' ? 55 : 0,
 		}
 	} catch (error) {
-		console.error(`Error al obtener telemetría del cruce ${crossingId}:`, error)
+		// Solo loguear errores en modo debug para no saturar la consola
+		if (API_CONFIG.DEBUG) {
+			console.error(`Error al obtener telemetría del cruce ${crossingId}:`, error)
+		}
 		throw error
 	}
 }
@@ -177,7 +183,10 @@ export const fetchAllTelemetry = async () => {
 		const telemetryData = await Promise.all(telemetryPromises)
 		return telemetryData
 	} catch (error) {
-		console.error('Error al obtener telemetría de todos los cruces:', error)
+		// Solo loguear errores en modo debug para no saturar la consola
+		if (API_CONFIG.DEBUG) {
+			console.error('Error al obtener telemetría de todos los cruces:', error)
+		}
 		throw error
 	}
 }
@@ -185,7 +194,7 @@ export const fetchAllTelemetry = async () => {
 // Verificar salud de la API
 export const checkHealth = async () => {
 	try {
-		const response = await fetchWithTimeout(`${API_CONFIG.BASE_URL}/health`)
+		const response = await fetchWithTimeout(`${API_CONFIG.BASE_URL}/api/health`)
 		
 		if (!response.ok) {
 			throw new Error(`Error HTTP: ${response.status}`)
@@ -193,7 +202,10 @@ export const checkHealth = async () => {
 
 		return await response.json()
 	} catch (error) {
-		console.error('Error al verificar salud de la API:', error)
+		// Solo loguear errores en modo debug para no saturar la consola
+		if (API_CONFIG.DEBUG) {
+			console.error('Error al verificar salud de la API:', error)
+		}
 		throw error
 	}
 }
@@ -211,7 +223,10 @@ export const resetESP32Data = async () => {
 
 		return await response.json()
 	} catch (error) {
-		console.error('Error al resetear datos del ESP32:', error)
+		// Solo loguear errores en modo debug para no saturar la consola
+		if (API_CONFIG.DEBUG) {
+			console.error('Error al resetear datos del ESP32:', error)
+		}
 		throw error
 	}
 }
