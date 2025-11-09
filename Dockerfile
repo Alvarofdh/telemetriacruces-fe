@@ -124,7 +124,7 @@ RUN chown -R nginx:nginx /usr/share/nginx/html && \
 # Exponer puerto 80
 EXPOSE 80
 
-# Health check mejorado
+# Health check mejorado (usa el endpoint /health de nginx, no /api/health)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
 	CMD wget --no-verbose --tries=1 --spider http://localhost/health || exit 1
 

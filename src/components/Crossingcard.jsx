@@ -1,8 +1,8 @@
 // src/components/CrossingCard.jsx
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-export function CrossingCard({ 
+function CrossingCardComponent({ 
   nombre, 
   estado, 
   bateria, 
@@ -90,48 +90,57 @@ export function CrossingCard({
 
   return (
     <div 
-      className="bg-white dark:bg-gray-800 shadow-lg rounded-xl border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-300 hover:scale-105 overflow-hidden cursor-pointer"
+      className="bg-white dark:bg-gray-800 shadow-lg rounded-xl border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all duration-300 hover:scale-[1.02] sm:hover:scale-105 overflow-hidden cursor-pointer"
       onClick={handleCardClick}
+      role="button"
+      tabIndex={0}
+      aria-label={`Ver detalles de ${nombre}`}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          handleCardClick(e)
+        }
+      }}
     >
       {/* Header de la tarjeta */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-600 px-6 py-4 border-b border-gray-100 dark:border-gray-600">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white truncate">{nombre}</h3>
-          <div className="flex items-center space-x-2">
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-600 px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 dark:border-gray-600">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white truncate flex-1 min-w-0">{nombre}</h3>
+          <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
             {getEstadoIcon(estado)}
-            <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getEstadoStyles(estado)}`}>
+            <span className={`px-2 py-1 text-xs font-medium rounded-full border whitespace-nowrap ${getEstadoStyles(estado)}`}>
               {estado}
             </span>
           </div>
         </div>
-        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 truncate">{ubicacion}</p>
+        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 mt-1 truncate">{ubicacion}</p>
       </div>
 
       {/* Contenido principal */}
-      <div className="p-6 space-y-4">
+      <div className="p-4 sm:p-6 space-y-3 sm:space-y-4">
         {/* Información principal en grid */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           {/* Batería */}
-          <div className="flex items-center space-x-2">
-            <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex items-center space-x-1.5 sm:space-x-2">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs text-gray-500 dark:text-gray-400">Batería</p>
-              <p className={`text-sm font-bold ${getBateriaColor(bateria)}`}>
+              <p className={`text-sm sm:text-base font-bold ${getBateriaColor(bateria)}`}>
                 {bateria}%
               </p>
             </div>
           </div>
 
           {/* Sensores */}
-          <div className="flex items-center space-x-2">
-            <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex items-center space-x-1.5 sm:space-x-2">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs text-gray-500 dark:text-gray-400">Sensores</p>
-              <p className="text-sm font-bold text-gray-900 dark:text-white">
+              <p className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">
                 {sensores}/4
               </p>
             </div>
@@ -172,13 +181,13 @@ export function CrossingCard({
         )}
 
         {/* Botones de acción */}
-        <div className="flex gap-2 pt-2">
+        <div className="flex flex-col sm:flex-row gap-2 pt-2">
           <button
             onClick={(e) => {
               e.stopPropagation();
               setShowDetails(!showDetails);
             }}
-            className="flex-1 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800 transition-colors text-sm font-medium"
+            className="flex-1 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800 transition-colors text-xs sm:text-sm font-medium"
           >
             {showDetails ? 'Ocultar' : 'Vista previa'}
           </button>
@@ -188,10 +197,10 @@ export function CrossingCard({
               e.stopPropagation();
               navegarADetalle();
             }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors text-sm font-medium flex items-center space-x-1"
+            className="flex-1 sm:flex-initial px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center space-x-1"
           >
             <span>Ver detalle</span>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
@@ -199,7 +208,7 @@ export function CrossingCard({
           {estado === 'ACTIVO' && (
             <button 
               onClick={(e) => e.stopPropagation()}
-              className="px-3 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors text-sm"
+              className="hidden sm:flex px-3 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors text-sm items-center justify-center"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -218,3 +227,15 @@ export function CrossingCard({
     </div>
   );
 }
+
+// Memoizar componente para evitar re-renders innecesarios
+export const CrossingCard = memo(CrossingCardComponent, (prevProps, nextProps) => {
+	// Solo re-renderizar si cambian estas props importantes
+	return (
+		prevProps.id_cruce === nextProps.id_cruce &&
+		prevProps.estado === nextProps.estado &&
+		prevProps.bateria === nextProps.bateria &&
+		prevProps.sensores === nextProps.sensores &&
+		prevProps.ultimaActividad === nextProps.ultimaActividad
+	)
+})

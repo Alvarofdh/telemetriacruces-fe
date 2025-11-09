@@ -1,0 +1,10 @@
+# robots.txt para Viametrica - Sistema de Monitoreo de Cruces Ferroviarios
+
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+
+# Sitemap
+Sitemap: https://viametrica-fe.psicosiodev.me/sitemap.xml
+

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useData } from '../contexts/DataContext'
+import { useMetaTags } from '../hooks/useMetaTags'
 import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
@@ -97,6 +98,13 @@ export function CruceDetail() {
 		}
 	}, [id, cruces])
 
+	// Actualizar meta tags dinámicamente
+	useMetaTags({
+		title: cruce ? `${cruce.nombre} - Viametrica` : 'Detalle de Cruce - Viametrica',
+		description: cruce ? `Información detallada del cruce ferroviario ${cruce.nombre} ubicado en ${cruce.ubicacion}` : 'Información detallada del cruce ferroviario',
+		keywords: cruce ? `cruces ferroviarios, ${cruce.nombre}, ${cruce.ubicacion}, monitoreo, telemetría` : 'cruces ferroviarios, monitoreo',
+	})
+
 	if (!cruce) {
 		return (
 			<div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
@@ -165,24 +173,24 @@ export function CruceDetail() {
 			{/* Header */}
 			<header className="bg-white dark:bg-gray-800 shadow-lg border-b border-gray-200 dark:border-gray-700">
 				<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-					<div className="flex items-center justify-between py-6">
-						<div className="flex items-center space-x-4">
+					<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 py-4 sm:py-6">
+						<div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
 							<button
 								onClick={() => navigate('/')}
-								className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors"
+								className="flex items-center space-x-1 sm:space-x-2 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors text-sm flex-shrink-0"
 							>
 								<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
 								</svg>
-								<span>Volver</span>
+								<span className="hidden sm:inline">Volver</span>
 							</button>
-							<div>
-								<h1 className="text-3xl font-bold text-gray-900 dark:text-white">{cruce.nombre}</h1>
-								<p className="text-gray-600 dark:text-gray-300">{cruce.ubicacion}</p>
+							<div className="min-w-0 flex-1">
+								<h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white truncate">{cruce.nombre}</h1>
+								<p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 truncate">{cruce.ubicacion}</p>
 							</div>
 						</div>
-						<div className="flex items-center space-x-4">
-							<span className={`px-3 py-1 text-sm font-medium rounded-full border ${getEstadoStyles(cruce.estado)}`}>
+						<div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
+							<span className={`px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium rounded-full border whitespace-nowrap ${getEstadoStyles(cruce.estado)}`}>
 								{cruce.estado}
 							</span>
 						</div>
@@ -191,9 +199,9 @@ export function CruceDetail() {
 			</header>
 
 			{/* Contenido Principal */}
-			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
 				{/* Estadísticas Rápidas */}
-				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+				<div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
 					<div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
 						<div className="flex items-center justify-between">
 							<div>

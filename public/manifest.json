@@ -1,0 +1,30 @@
+{
+  "name": "Viametrica - Sistema de Monitoreo de Cruces Ferroviarios",
+  "short_name": "Viametrica",
+  "description": "Sistema de monitoreo en tiempo real de cruces ferroviarios inteligentes",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3B82F6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["utilities", "productivity"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Ver el dashboard principal",
+      "url": "/",
+      "icons": [{ "src": "/vite.svg", "sizes": "96x96" }]
+    }
+  ]
+}
+

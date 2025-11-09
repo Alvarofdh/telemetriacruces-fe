@@ -1,11 +1,13 @@
 import React, { useState } from 'react'
 import { useData } from '../../contexts/DataContext'
+import { useDebounce } from '../../hooks/useDebounce'
 
 export function CruceManagement() {
   const { cruces, agregarCruce, actualizarCruce, eliminarCruce } = useData()
   const [showForm, setShowForm] = useState(false)
   const [editingCruce, setEditingCruce] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
   const initialForm = {
     nombre: '',
@@ -19,10 +21,13 @@ export function CruceManagement() {
 
   const [formData, setFormData] = useState(initialForm)
 
-  const filteredCruces = cruces.filter(cruce => 
-    cruce.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cruce.ubicacion.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredCruces = cruces.filter(cruce => {
+    const search = debouncedSearchTerm.toLowerCase()
+    return (
+      cruce.nombre.toLowerCase().includes(search) ||
+      cruce.ubicacion.toLowerCase().includes(search)
+    )
+  })
 
   const handleSubmit = (e) => {
     e.preventDefault()

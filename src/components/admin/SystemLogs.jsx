@@ -1,15 +1,18 @@
 import React, { useState } from 'react'
 import { useData } from '../../contexts/DataContext'
+import { useDebounce } from '../../hooks/useDebounce'
 
 export function SystemLogs() {
   const { logs } = useData()
   const [filterAction, setFilterAction] = useState('TODOS')
   const [searchTerm, setSearchTerm] = useState('')
+  const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
   const filteredLogs = logs.filter(log => {
     const matchesAction = filterAction === 'TODOS' || log.accion === filterAction
-    const matchesSearch = log.usuario.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         log.detalle.toLowerCase().includes(searchTerm.toLowerCase())
+    const search = debouncedSearchTerm.toLowerCase()
+    const matchesSearch = log.usuario.toLowerCase().includes(search) ||
+                         log.detalle.toLowerCase().includes(search)
     return matchesAction && matchesSearch
   })
 

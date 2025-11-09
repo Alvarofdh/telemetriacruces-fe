@@ -98,23 +98,23 @@ export function AlertPanel() {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden">
       {/* Header del panel */}
-      <div className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-gray-700 dark:to-gray-600 px-6 py-4 border-b border-gray-100 dark:border-gray-600">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <svg className="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-gray-700 dark:to-gray-600 px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 dark:border-gray-600">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+            <svg className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600 dark:text-orange-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5-5-5h5V3h0z" />
             </svg>
-            <div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Centro de Alertas</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-300">Notificaciones del sistema</p>
+            <div className="min-w-0">
+              <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white truncate">Centro de Alertas</h3>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 truncate">Notificaciones del sistema</p>
             </div>
           </div>
           {alertasNoLeidas.length > 0 && (
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
               <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
                 {alertasNoLeidas.length}
               </span>
-              <span className="text-sm text-gray-600 dark:text-gray-300">sin leer</span>
+              <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 hidden sm:inline">sin leer</span>
             </div>
           )}
         </div>
@@ -126,27 +126,27 @@ export function AlertPanel() {
           alertasAMostrar.map((alert) => (
             <div
               key={alert.id}
-              className={`border-l-4 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer ${getAlertaStyles(alert.tipo)} ${
+              className={`border-l-4 p-3 sm:p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer ${getAlertaStyles(alert.tipo)} ${
                 !alert.leido ? 'bg-opacity-80' : 'bg-opacity-30'
               }`}
               onClick={() => marcarComoLeido(alert.id)}
             >
-              <div className="flex items-start space-x-3">
+              <div className="flex items-start space-x-2 sm:space-x-3">
                 <div className="flex-shrink-0">
                   {getAlertaIcon(alert.tipo)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <p className={`text-sm ${!alert.leido ? 'font-semibold text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className={`text-xs sm:text-sm ${!alert.leido ? 'font-semibold text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'} break-words`}>
                       {alert.mensaje}
                     </p>
                     {!alert.leido && (
-                      <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 ml-2"></div>
+                      <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1"></div>
                     )}
                   </div>
-                  <div className="flex items-center justify-between mt-1">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{alert.cruce}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{formatearFecha(alert.timestamp)}</p>
+                  <div className="flex items-center justify-between mt-1.5 sm:mt-1 gap-2">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{alert.cruce}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatearFecha(alert.timestamp)}</p>
                   </div>
                 </div>
               </div>
@@ -165,12 +165,12 @@ export function AlertPanel() {
 
       {/* Footer del panel */}
       {alerts.length > 3 && (
-        <div className="bg-gray-50 dark:bg-gray-700 px-6 py-3 border-t border-gray-100 dark:border-gray-600">
+        <div className="bg-gray-50 dark:bg-gray-700 px-4 sm:px-6 py-2 sm:py-3 border-t border-gray-100 dark:border-gray-600">
           <button
             onClick={() => setMostrarTodas(!mostrarTodas)}
-            className="w-full text-center text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+            className="w-full text-center text-xs sm:text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
           >
-            {mostrarTodas ? 'Mostrar menos' : `Ver todas las alertas (${alerts.length})`}
+            {mostrarTodas ? 'Mostrar menos' : `Ver todas (${alerts.length})`}
           </button>
         </div>
       )}

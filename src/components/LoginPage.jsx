@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../contexts/DataContext'
+import { sanitizeEmail, isValidEmail } from '../utils/sanitize'
+import { formRateLimiter } from '../utils/rateLimiter'
 
 export function LoginPage() {
 	const { login } = useData()
@@ -12,21 +14,67 @@ export function LoginPage() {
 	const [error, setError] = useState('')
 	const [loading, setLoading] = useState(false)
 
+	// Validación de contraseña
+	const validatePassword = (password) => {
+		return password.length >= 8
+	}
+
 	const handleSubmit = async (e) => {
 		e.preventDefault()
+		
+		// Rate limiting
+		if (!formRateLimiter.isAllowed('login')) {
+			setError('Demasiados intentos. Por favor, espera unos segundos.')
+			return
+		}
+
+		// Validación en cliente
+		if (!formData.email || !formData.password) {
+			setError('Por favor, completa todos los campos.')
+			return
+		}
+
+		// Sanitizar y validar email
+		const sanitizedEmail = sanitizeEmail(formData.email)
+		if (!isValidEmail(sanitizedEmail)) {
+			setError('Por favor, ingresa un email válido.')
+			return
+		}
+
+		if (!validatePassword(formData.password)) {
+			setError('La contraseña debe tener al menos 8 caracteres.')
+			return
+		}
+
 		setLoading(true)
 		setError('')
 
 		try {
-			const success = login(formData.email, formData.password)
+			// Usar email sanitizado
+			const success = await login(sanitizedEmail, formData.password)
 			if (success) {
 				// Redirigir al dashboard después de login exitoso
 				navigate('/')
-			} else {
-				setError('Credenciales inválidas. Usa admin@cruces-ferro.cl / admin123')
 			}
-		} catch {
-			setError('Error al iniciar sesión')
+		} catch (err) {
+			// Mensajes de error más específicos
+			let errorMessage = 'Credenciales inválidas. Por favor, verifica tu email y contraseña.'
+			
+			if (err.message) {
+				if (err.message.includes('401') || err.message.includes('Unauthorized')) {
+					errorMessage = 'Credenciales incorrectas. Por favor, verifica tu email y contraseña.'
+				} else if (err.message.includes('403') || err.message.includes('Forbidden')) {
+					errorMessage = 'No tienes permisos para acceder. Contacta al administrador.'
+				} else if (err.message.includes('Network') || err.message.includes('fetch')) {
+					errorMessage = 'Error de conexión. Por favor, verifica tu conexión a internet.'
+				} else if (err.message.includes('Demasiadas')) {
+					errorMessage = err.message
+				} else {
+					errorMessage = err.message
+				}
+			}
+			
+			setError(errorMessage)
 		} finally {
 			setLoading(false)
 		}
@@ -69,6 +117,9 @@ export function LoginPage() {
                 onChange={(e) => setFormData({...formData, email: e.target.value})}
                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 placeholder="tu@email.com"
+                aria-label="Email"
+                aria-required="true"
+                autoComplete="email"
               />
             </div>
 
@@ -83,6 +134,9 @@ export function LoginPage() {
                 onChange={(e) => setFormData({...formData, password: e.target.value})}
                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 placeholder="••••••••"
+                aria-label="Contraseña"
+                aria-required="true"
+                autoComplete="current-password"
               />
             </div>
 
@@ -103,6 +157,8 @@ export function LoginPage() {
               type="submit"
               disabled={loading}
               className="w-full py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Iniciar sesión"
+              aria-busy={loading}
             >
               {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </button>
