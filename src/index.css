@@ -22,6 +22,12 @@
     -moz-osx-font-smoothing: grayscale;
   }
   
+  /* Asegurar que break-words funcione correctamente */
+  .break-words {
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+  
   /* Personalización de scrollbars para modo oscuro */
   ::-webkit-scrollbar {
     width: 8px;

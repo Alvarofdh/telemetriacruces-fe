@@ -5,12 +5,36 @@ import { http } from './httpClient'
  * Obtener lista de alertas (paginado)
  * @param {Object} params - Parámetros de paginación y filtros
  * @param {number} params.page - Número de página
+ * @param {number} params.page_size - Tamaño de página
+ * @param {number} [params.cruce] - Filtrar por ID de cruce
+ * @param {boolean} [params.resolved] - Filtrar por estado resuelto (false = solo no resueltas)
+ * @param {string} [params.type] - Filtrar por tipo de alerta (LOW_BATTERY, SENSOR_ERROR, etc.)
+ * @param {string} [params.severity] - Filtrar por severidad (CRITICAL, WARNING, INFO)
+ * @param {string} [params.created_at] - Filtrar por fecha de creación
  * @returns {Promise<Object>} Lista de alertas con paginación
  */
 export const getAlertas = async (params = {}) => {
 	const queryParams = new URLSearchParams()
 	if (params.page) {
 		queryParams.append('page', params.page)
+	}
+	if (params.page_size) {
+		queryParams.append('page_size', params.page_size)
+	}
+	if (params.cruce !== undefined) {
+		queryParams.append('cruce', params.cruce)
+	}
+	if (params.resolved !== undefined) {
+		queryParams.append('resolved', params.resolved)
+	}
+	if (params.type) {
+		queryParams.append('type', params.type)
+	}
+	if (params.severity) {
+		queryParams.append('severity', params.severity)
+	}
+	if (params.created_at) {
+		queryParams.append('created_at', params.created_at)
 	}
 	
 	const queryString = queryParams.toString()
@@ -99,4 +123,34 @@ export const getAlertasDashboard = async (params = {}) => {
 	const endpoint = `/api/alertas/dashboard/${queryString ? `?${queryString}` : ''}`
 	
 	return await http.get(endpoint)
+}
+
+/**
+ * Exportar alertas a CSV
+ * @param {Object} params - Parámetros de filtrado
+ * @param {number} [params.cruce] - Filtrar por ID de cruce
+ * @param {boolean} [params.resolved] - Filtrar por estado resuelto
+ * @param {string} [params.type] - Filtrar por tipo de alerta
+ * @param {string} [params.severity] - Filtrar por severidad
+ * @returns {Promise<Blob>} Archivo CSV
+ */
+export const exportAlertas = async (params = {}) => {
+	const queryParams = new URLSearchParams()
+	if (params.cruce) {
+		queryParams.append('cruce', params.cruce)
+	}
+	if (params.resolved !== undefined) {
+		queryParams.append('resolved', params.resolved)
+	}
+	if (params.type) {
+		queryParams.append('type', params.type)
+	}
+	if (params.severity) {
+		queryParams.append('severity', params.severity)
+	}
+	
+	const queryString = queryParams.toString()
+	const endpoint = `/api/alertas/exportar/${queryString ? `?${queryString}` : ''}`
+	
+	return await http.get(endpoint, { responseType: 'blob' })
 }

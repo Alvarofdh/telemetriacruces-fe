@@ -5,7 +5,10 @@ import { http } from './httpClient'
  * Obtener lista de eventos de barrera (paginado)
  * @param {Object} params - Parámetros de paginación y filtros
  * @param {number} params.page - Número de página
+ * @param {number} params.page_size - Tamaño de página
  * @param {number} [params.cruce] - Filtrar por ID de cruce
+ * @param {string} [params.state] - Filtrar por estado (UP, DOWN)
+ * @param {string} [params.event_time] - Filtrar por fecha del evento (formato ISO 8601)
  * @returns {Promise<Object>} Lista de eventos con paginación
  */
 export const getBarrierEvents = async (params = {}) => {
@@ -13,8 +16,17 @@ export const getBarrierEvents = async (params = {}) => {
 	if (params.page) {
 		queryParams.append('page', params.page)
 	}
+	if (params.page_size) {
+		queryParams.append('page_size', params.page_size)
+	}
 	if (params.cruce) {
 		queryParams.append('cruce', params.cruce)
+	}
+	if (params.state) {
+		queryParams.append('state', params.state)
+	}
+	if (params.event_time) {
+		queryParams.append('event_time', params.event_time)
 	}
 	
 	const queryString = queryParams.toString()

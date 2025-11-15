@@ -1,5 +1,5 @@
 import React from 'react'
-import { useData } from '../../contexts/DataContext'
+import { useData } from '../../hooks/useData'
 
 export function AnalyticsPanel() {
   const { cruces, logs, stats } = useData()

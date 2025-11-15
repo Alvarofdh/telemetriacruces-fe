@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useData } from '../contexts/DataContext'
+import { useData } from '../hooks/useData'
 import toast from 'react-hot-toast'
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'

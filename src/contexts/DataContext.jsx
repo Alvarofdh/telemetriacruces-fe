@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import {
 	checkHealth,
 	getCruces,
@@ -14,18 +14,13 @@ import {
 	logout as apiLogout,
 	getStoredUser,
 	isAuthenticated,
+	usuariosAPI,
+	logsAPI,
 } from '../services'
-
-const DataContext = createContext()
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const useData = () => {
-	const context = useContext(DataContext)
-	if (!context) {
-		throw new Error('useData debe ser usado dentro de un DataProvider')
-	}
-	return context
-}
+import { connectSocket, disconnectSocket, socketEvents, getSocket } from '../services/socket'
+import { getAccessToken } from '../services/httpClient'
+import toast from 'react-hot-toast'
+import { DataContext } from './DataContext'
 
 export function DataProvider({ children }) {
 	// Estado de autenticación con persistencia en localStorage
@@ -43,6 +38,10 @@ export function DataProvider({ children }) {
 	const [isESP32Connected, setIsESP32Connected] = useState(false)
 	const [lastUpdate, setLastUpdate] = useState(null)
 	const [error, setError] = useState(null)
+	const crucesRef = useRef([]) // ✅ NUEVO: Referencia para acceder a cruces en callbacks
+	const isLoadingRef = useRef(false) // ✅ NUEVO: Prevenir múltiples cargas simultáneas
+	const subscribedRoomsRef = useRef(new Set()) // ✅ NUEVO: Rastrear salas ya suscritas para evitar re-suscripciones
+	const previousCruceIdsStringRef = useRef('') // ✅ NUEVO: Rastrear string de IDs anterior para comparación
 
 	// Datos mock de cruces (fallback cuando no hay conexión con ESP32)
 	const crucesBackup = [
@@ -176,73 +175,17 @@ export function DataProvider({ children }) {
 		}
 	]
 
-	// Usuarios del sistema
-	const [usuarios, setUsuarios] = useState([
-		{
-			id: 1,
-			nombre: 'Admin Principal',
-			email: 'admin@cruces-ferro.cl',
-			rol: 'SUPER_ADMIN',
-			estado: 'ACTIVO',
-			ultimoAcceso: '2024-01-15 10:30',
-			permisos: ['READ', 'WRITE', 'DELETE', 'ADMIN']
-		},
-		{
-			id: 2,
-			nombre: 'Carlos Mendoza',
-			email: 'carlos.mendoza@cruces-ferro.cl',
-			rol: 'OPERADOR',
-			estado: 'ACTIVO',
-			ultimoAcceso: '2024-01-15 09:15',
-			permisos: ['READ', 'WRITE']
-		},
-		{
-			id: 3,
-			nombre: 'Ana García',
-			email: 'ana.garcia@cruces-ferro.cl',
-			rol: 'TECNICO',
-			estado: 'ACTIVO',
-			ultimoAcceso: '2024-01-14 16:45',
-			permisos: ['READ', 'WRITE']
-		},
-		{
-			id: 4,
-			nombre: 'Luis Rodriguez',
-			email: 'luis.rodriguez@cruces-ferro.cl',
-			rol: 'SUPERVISOR',
-			estado: 'ACTIVO',
-			ultimoAcceso: '2024-01-15 08:20',
-			permisos: ['READ', 'WRITE', 'DELETE']
-		}
-	])
+	// Usuarios del sistema (cargados del backend)
+	const [usuarios, setUsuarios] = useState([])
+	const [isLoadingUsuarios, setIsLoadingUsuarios] = useState(false)
+	const [usuariosError, setUsuariosError] = useState(null)
+	const isLoadingUsuariosRef = useRef(false)
 
-	// Logs de actividad del sistema
-	const [logs, setLogs] = useState([
-		{
-			id: 1,
-			fecha: '2024-01-15 10:30:15',
-			usuario: 'Admin Principal',
-			accion: 'LOGIN',
-			detalle: 'Inicio de sesión exitoso',
-			ip: '192.168.1.100'
-		},
-		{
-			id: 2,
-			fecha: '2024-01-15 10:25:32',
-			usuario: 'Carlos Mendoza',
-			accion: 'UPDATE_CRUCE',
-			detalle: 'Actualizado estado del Cruce La Serena',
-			ip: '192.168.1.105'
-		},
-		{
-			id: 3,
-			fecha: '2024-01-15 09:45:18',
-			usuario: 'Ana García',
-			accion: 'MAINTENANCE',
-			detalle: 'Programado mantenimiento para Cruce Coquimbo',
-			ip: '192.168.1.108'
-		}
-	])
+	// Logs de actividad del sistema (cargados del backend)
+	const [logs, setLogs] = useState([])
+	const [isLoadingLogs, setIsLoadingLogs] = useState(false)
+	const [logsError, setLogsError] = useState(null)
+	const isLoadingLogsRef = useRef(false)
 
 	// Configuración del sistema
 	const [configuracion, setConfiguracion] = useState({
@@ -261,8 +204,19 @@ export function DataProvider({ children }) {
 	const lastErrorLogTime = useRef(0)
 	const ERROR_LOG_INTERVAL = 30000 // Solo loguear errores cada 30 segundos
 
-	// Función para cargar datos del backend con toda la información
-	const loadESP32Data = async () => {
+	// ✅ isLoadingRef ya está declarado arriba (línea 49), no se necesita declarar nuevamente
+
+	// Función optimizada para cargar solo datos básicos inicialmente
+	// Los detalles se cargarán bajo demanda o vía Socket.IO
+	const loadESP32Data = async (loadFullDetails = false) => {
+		// Evitar múltiples cargas simultáneas
+		if (isLoadingRef.current) {
+			if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+				console.log('⏸️ Carga ya en progreso, omitiendo...')
+			}
+			return
+		}
+
 		// Solo cargar si hay autenticación
 		if (!isAuthenticated()) {
 			setIsESP32Connected(false)
@@ -271,6 +225,7 @@ export function DataProvider({ children }) {
 			return
 		}
 
+		isLoadingRef.current = true
 		setIsLoading(true)
 		setError(null)
 
@@ -278,66 +233,93 @@ export function DataProvider({ children }) {
 			await checkHealth()
 			setIsESP32Connected(true)
 
-			// Obtener lista completa de cruces
+			// Obtener lista básica de cruces (sin detalles)
 			const crucesResponse = await getCruces()
 			const crucesLista = crucesResponse.results || crucesResponse || []
 			
-			// Para cada cruce, obtener sus detalles completos (incluye telemetría según el esquema)
-			const crucesCompletos = await Promise.allSettled(
-				crucesLista.map(async (cruce) => {
-					try {
-						// Obtener detalles completos del cruce (incluye telemetría)
-						const cruceDetalle = await getCruce(cruce.id)
-						
-						// Obtener telemetría más reciente del cruce
-						let telemetriaReciente = null
+			// Si loadFullDetails es false, solo cargar datos básicos
+			// Los detalles se obtendrán vía Socket.IO o bajo demanda
+			if (!loadFullDetails) {
+				// Cargar solo datos básicos de cada cruce
+				const crucesBasicos = crucesLista.map(cruce => ({
+					id_cruce: cruce.id,
+					nombre: cruce.nombre,
+					ubicacion: cruce.ubicacion,
+					estado: cruce.estado || 'ACTIVO',
+					coordenadas: {
+						lat: cruce.coordenadas_lat || 0,
+						lng: cruce.coordenadas_lng || 0,
+					},
+					created_at: cruce.created_at,
+					updated_at: cruce.updated_at,
+					bateria: 0, // Se actualizará vía Socket.IO
+					sensoresActivos: 0, // Se actualizará vía Socket.IO
+					alertasActivas: 0, // Se actualizará vía Socket.IO
+					ultimaActividad: cruce.updated_at || cruce.created_at,
+					...cruce,
+				}))
+
+				setCruces(crucesBasicos)
+				setLastUpdate(new Date())
+				
+				if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+					console.log(`✅ Datos básicos cargados: ${crucesBasicos.length} cruces`)
+				}
+			} else {
+				// Cargar detalles completos solo si se solicita explícitamente
+				const crucesCompletos = await Promise.allSettled(
+					crucesLista.map(async (cruce) => {
 						try {
-							const telemetriaResponse = await getTelemetria({ cruce: cruce.id, page: 1 })
-							const telemetriaLista = telemetriaResponse.results || telemetriaResponse || []
-							telemetriaReciente = telemetriaLista.length > 0 ? telemetriaLista[0] : null
-						} catch (err) {
-							if (import.meta.env.VITE_DEBUG_MODE === 'true') {
-								console.warn(`⚠️ No se pudo obtener telemetría del cruce ${cruce.id}:`, err)
+							// Obtener detalles completos del cruce
+							const cruceDetalle = await getCruce(cruce.id)
+							
+							// Obtener telemetría más reciente del cruce
+							let telemetriaReciente = null
+							try {
+								const telemetriaResponse = await getTelemetria({ cruce: cruce.id, page: 1 })
+								const telemetriaLista = telemetriaResponse.results || telemetriaResponse || []
+								telemetriaReciente = telemetriaLista.length > 0 ? telemetriaLista[0] : null
+							} catch (err) {
+								if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+									console.warn(`⚠️ No se pudo obtener telemetría del cruce ${cruce.id}:`, err)
+								}
 							}
-						}
-						
-						// Obtener alertas activas del cruce
-						let alertasActivas = []
-						try {
-							const alertasResponse = await getAlertas({ page: 1 })
-							const alertasLista = alertasResponse.results || alertasResponse || []
-							alertasActivas = alertasLista.filter(a => 
-								a.cruce === cruce.id && !a.resolved
-							)
-						} catch (err) {
-							if (import.meta.env.VITE_DEBUG_MODE === 'true') {
-								console.warn(`⚠️ No se pudo obtener alertas del cruce ${cruce.id}:`, err)
+							
+							// Obtener alertas activas del cruce (FILTRADO EN BACKEND)
+							let alertasActivas = []
+							try {
+								const alertasResponse = await getAlertas({ cruce: cruce.id, resolved: false, page: 1 })
+								const alertasLista = alertasResponse.results || alertasResponse || []
+								alertasActivas = alertasLista
+							} catch (err) {
+								if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+									console.warn(`⚠️ No se pudo obtener alertas del cruce ${cruce.id}:`, err)
+								}
 							}
-						}
-						
-						// Obtener sensores del cruce
-						let sensores = []
-						try {
-							const sensoresResponse = await getSensores({ cruce: cruce.id })
-							const sensoresLista = sensoresResponse.results || sensoresResponse || []
-							sensores = sensoresLista
-						} catch (err) {
-							if (import.meta.env.VITE_DEBUG_MODE === 'true') {
-								console.warn(`⚠️ No se pudo obtener sensores del cruce ${cruce.id}:`, err)
+							
+							// Obtener sensores del cruce
+							let sensores = []
+							try {
+								const sensoresResponse = await getSensores({ cruce: cruce.id })
+								const sensoresLista = sensoresResponse.results || sensoresResponse || []
+								sensores = sensoresLista
+							} catch (err) {
+								if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+									console.warn(`⚠️ No se pudo obtener sensores del cruce ${cruce.id}:`, err)
+								}
 							}
-						}
-						
-						// Obtener eventos de barrera recientes
-						let eventosBarrera = []
-						try {
-							const eventosResponse = await getBarrierEvents({ cruce: cruce.id, page: 1 })
-							const eventosLista = eventosResponse.results || eventosResponse || []
-							eventosBarrera = eventosLista.slice(0, 5) // Últimos 5 eventos
-						} catch (err) {
-							if (import.meta.env.VITE_DEBUG_MODE === 'true') {
-								console.warn(`⚠️ No se pudo obtener eventos de barrera del cruce ${cruce.id}:`, err)
+							
+							// Obtener eventos de barrera recientes
+							let eventosBarrera = []
+							try {
+								const eventosResponse = await getBarrierEvents({ cruce: cruce.id, page: 1 })
+								const eventosLista = eventosResponse.results || eventosResponse || []
+								eventosBarrera = eventosLista.slice(0, 5) // Últimos 5 eventos
+							} catch (err) {
+								if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+									console.warn(`⚠️ No se pudo obtener eventos de barrera del cruce ${cruce.id}:`, err)
+								}
 							}
-						}
 						
 						// Calcular batería desde telemetría o usar valor por defecto
 						const batteryVoltage = telemetriaReciente?.battery_voltage || 0
@@ -425,12 +407,12 @@ export function DataProvider({ children }) {
 				.map(result => result.value)
 				.filter(cruce => cruce !== null)
 
-			setCruces(crucesTransformados)
-			setLastUpdate(new Date())
-			
-			// Solo loguear éxito en modo debug
-			if (import.meta.env.VITE_DEBUG_MODE === 'true') {
-				console.log(`✅ Datos del backend cargados exitosamente: ${crucesTransformados.length} cruces`)
+				setCruces(crucesTransformados)
+				setLastUpdate(new Date())
+				
+				if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+					console.log(`✅ Datos completos cargados: ${crucesTransformados.length} cruces`)
+				}
 			}
 		} catch (err) {
 			setIsESP32Connected(false)
@@ -448,26 +430,455 @@ export function DataProvider({ children }) {
 			}
 		} finally {
 			setIsLoading(false)
+			isLoadingRef.current = false
 		}
 	}
 
-	// Efecto para cargar datos al montar y refrescar cada 30 segundos (reducido para producción)
+	// Efecto para cargar datos iniciales y conectar Socket.IO
 	useEffect(() => {
 		if (user && isAuthenticated()) {
-			loadESP32Data()
+			// Cargar solo datos básicos inicialmente (sin detalles completos)
+			// Los detalles se cargarán vía Socket.IO o bajo demanda
+			loadESP32Data(false)
 
-			const interval = setInterval(() => {
-				if (isAuthenticated()) {
-					loadESP32Data()
-				}
-			}, 30000) // 30 segundos para producción
+			// Cargar usuarios y logs del sistema
+			loadUsuarios()
+			loadLogs()
 
-			return () => clearInterval(interval)
+			// Conectar Socket.IO
+			const token = getAccessToken()
+			if (token) {
+				connectSocket(token)
+			}
+
+			// Cleanup: desconectar Socket.IO al desmontar o cambiar de usuario
+			return () => {
+				disconnectSocket()
+			}
+		} else {
+			// Si no hay usuario, desconectar Socket.IO y limpiar datos
+			disconnectSocket()
+			setUsuarios([])
+			setLogs([])
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [user])
+	
+	// ✅ NUEVO: Sincronizar crucesRef con cruces
+	useEffect(() => {
+		crucesRef.current = cruces
+	}, [cruces])
+	
+	// ✅ CORRECCIÓN CRÍTICA: Suscribirse SOLO cuando cambia el conjunto de IDs (no en cada actualización)
+	useEffect(() => {
+		if (!user || !isAuthenticated()) {
+			return
+		}
+		
+		const socket = getSocket()
+		if (!socket || !socket.connected || !cruces || cruces.length === 0) {
+			return
+		}
+		
+		// Calcular string de IDs actual
+		const currentCruceIdsString = cruces.map(c => String(c.id || c.id_cruce)).sort().join(',')
+		
+		// Comparar con el anterior (solo IDs, no datos completos)
+		if (currentCruceIdsString === previousCruceIdsStringRef.current) {
+			// No hay cambios en el conjunto de IDs, solo actualizaciones individuales
+			// No re-suscribirse para evitar rate limiting
+			return
+		}
+		
+		// El conjunto de IDs cambió: actualizar suscripciones
+		const currentCruceIds = new Set(cruces.map(cruce => cruce.id || cruce.id_cruce))
+		const cruceRooms = Array.from(currentCruceIds).map(id => `cruce_${id}`)
+		
+		// Suscribirse solo a las nuevas salas
+		const nuevasSalas = cruceRooms.filter(room => !subscribedRoomsRef.current.has(room))
+		
+		if (nuevasSalas.length > 0) {
+			console.log('📡 [DataContext] Nuevos cruces detectados, suscribiéndose a:', nuevasSalas)
+			socketEvents.subscribe(nuevasSalas)
+			
+			// También hacer join_room para cada nueva sala
+			nuevasSalas.forEach(room => {
+				socket.emit('join_room', { room })
+				subscribedRoomsRef.current.add(room)
+			})
+		}
+		
+		// Limpiar salas de cruces que ya no existen
+		const salasRemovidas = Array.from(subscribedRoomsRef.current).filter(room => 
+			!cruceRooms.includes(room)
+		)
+		if (salasRemovidas.length > 0) {
+			console.log('🧹 [DataContext] Cruces removidos, limpiando suscripciones:', salasRemovidas)
+			salasRemovidas.forEach(room => {
+				socket.emit('leave_room', { room })
+				subscribedRoomsRef.current.delete(room)
+			})
+		}
+		
+		// Actualizar referencias
+		subscribedRoomsRef.current = new Set(cruceRooms)
+		previousCruceIdsStringRef.current = currentCruceIdsString
+	}, [cruces, user]) // ✅ Re-ejecutar cuando cruces cambia, pero dentro verificamos si los IDs cambiaron
+
+	// Efecto para escuchar eventos de Socket.IO y actualizar estado en tiempo real
+	useEffect(() => {
+		if (!user || !isAuthenticated()) {
+			return
+		}
+
+		// ✅ CORRECCIÓN CRÍTICA: Handler usa crucesRef para tener siempre la lista actualizada
+		const handleConnected = (data) => {
+			console.log('✅ [DataContext] Usuario autenticado en Socket.IO:', data.user)
+			
+			// Suscribirse a eventos generales
+			const generalEvents = ['telemetria', 'barrier_events', 'alertas']
+			console.log('📡 [DataContext] Suscribiéndose a eventos generales:', generalEvents)
+			socketEvents.subscribe(generalEvents)
+			
+			// ✅ USAR crucesRef (no cruces) para evitar cierre sobre valor obsoleto
+			if (crucesRef.current && crucesRef.current.length > 0) {
+				const socket = getSocket()
+				const cruceRooms = crucesRef.current.map(cruce => `cruce_${cruce.id || cruce.id_cruce}`)
+				console.log('📡 [DataContext] Re-suscribiéndose tras reconexión a cruces:', cruceRooms)
+				socketEvents.subscribe(cruceRooms)
+				
+				// También hacer join_room para cada cruce
+				cruceRooms.forEach(room => {
+					socket.emit('join_room', { room })
+				})
+			}
+		}
+		
+		// Handler para confirmación de suscripción
+		const handleSubscribed = (data) => {
+			console.log('✅ [DataContext] Suscripción confirmada:', data)
+		}
+		
+		// Handler para confirmación de unión a sala
+		const handleJoinedRoom = (data) => {
+			console.log('✅ [DataContext] Unido a sala:', data)
+		}
+
+		// Handler para notificaciones generales
+		const handleNotification = (notificationData) => {
+			if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+				console.log('🔔 Notificación:', notificationData)
+			}
+			// Aquí puedes agregar lógica para mostrar notificaciones al usuario
+			// Por ejemplo, usando react-hot-toast o un sistema de notificaciones
+		}
+
+		// Handler para actualizaciones del dashboard
+		const handleDashboardUpdate = (data) => {
+			if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+				console.log('📊 Dashboard actualizado:', data)
+			}
+			// NO recargar todos los datos - Socket.IO ya actualiza los cambios individuales
+			// Solo actualizar estadísticas si es necesario
+			setLastUpdate(new Date())
+		}
+
+		// ⚠️ NOTA: Handlers comentados porque el backend NO emite estos eventos
+		/*
+		// Handler para cuando se crea un nuevo cruce (NO IMPLEMENTADO EN BACKEND)
+		const handleCruceCreated = (cruceData) => {
+			if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+				console.log('🆕 Nuevo cruce creado:', cruceData)
+			}
+			const cruceTransformado = transformCruceData(cruceData)
+			setCruces(prev => [...prev, cruceTransformado])
+			setLastUpdate(new Date())
+		}
+
+		// Handler para cuando se actualiza un cruce (NO IMPLEMENTADO EN BACKEND)
+		const handleCruceUpdated = (cruceData) => {
+			if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+				console.log('🔄 Cruce actualizado (cruce_updated):', cruceData)
+			}
+			const cruceTransformado = transformCruceData(cruceData)
+			setCruces(prev => prev.map(c => 
+				c.id_cruce === cruceTransformado.id_cruce ? cruceTransformado : c
+			))
+			setLastUpdate(new Date())
+		}
+		*/
+		
+		// ✅ Handler para evento 'cruce_update' (emitido a salas específicas: cruce_21, cruce_22, etc.)
+		// Este es el evento principal que emite el backend cuando se actualiza un cruce
+		const handleCruceUpdate = (cruceData) => {
+			if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+				console.log('🔄 [DataContext] Evento cruce_update recibido:', cruceData)
+			}
+			// Transformar y actualizar el cruce existente
+			const cruceTransformado = transformCruceData(cruceData)
+			setCruces(prev => prev.map(c => 
+				c.id_cruce === cruceTransformado.id_cruce ? cruceTransformado : c
+			))
+			setLastUpdate(new Date())
+		}
+
+		// ⚠️ NOTA: Los siguientes handlers están comentados porque el backend NO emite estos eventos
+		// El backend solo emite: cruce_update, new_telemetria, barrier_event, new_alerta, alerta_resolved
+		
+		/*
+		// Handler para cuando se elimina un cruce (NO IMPLEMENTADO EN BACKEND)
+		const handleCruceDeleted = (data) => {
+			const cruceId = data.id || data.cruce_id || data.id_cruce
+			if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+				console.log('🗑️ Cruce eliminado:', cruceId)
+			}
+			setCruces(prev => prev.filter(c => c.id_cruce !== cruceId))
+			setLastUpdate(new Date())
+		}
+
+		// Handler para actualización de lista completa (NO IMPLEMENTADO EN BACKEND)
+		const handleCrucesListUpdated = async () => {
+			if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+				console.log('📋 Lista de cruces actualizada')
+			}
+			await loadESP32Data(false)
+		}
+		*/
+
+		// Handler para actualización de telemetría
+		const handleTelemetriaUpdated = (telemetriaData) => {
+			if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+				console.log('📊 Telemetría actualizada:', telemetriaData)
+			}
+			const cruceId = telemetriaData.cruce || telemetriaData.id_cruce
+			if (!cruceId) return
+
+			// Actualizar telemetría del cruce correspondiente
+			setCruces(prev => prev.map(cruce => {
+				if (cruce.id_cruce === cruceId) {
+					const batteryVoltage = telemetriaData.battery_voltage || 0
+					const bateriaPorcentaje = batteryVoltage > 0 
+						? Math.min(100, Math.max(0, ((batteryVoltage - 10) / (14.4 - 10)) * 100))
+						: cruce.bateria
+
+					return {
+						...cruce,
+						bateria: Math.round(bateriaPorcentaje),
+						voltage: telemetriaData.barrier_voltage || cruce.voltage,
+						battery_voltage: telemetriaData.battery_voltage || cruce.battery_voltage,
+						temperature: telemetriaData.temperature || cruce.temperature,
+						barrier_state: telemetriaData.barrier_status || cruce.barrier_state,
+						signal_strength: telemetriaData.signal_strength || cruce.signal_strength,
+						rssi: telemetriaData.signal_strength || cruce.rssi,
+						sensor_1: telemetriaData.sensor_1 !== undefined ? telemetriaData.sensor_1 : cruce.sensor_1,
+						sensor_2: telemetriaData.sensor_2 !== undefined ? telemetriaData.sensor_2 : cruce.sensor_2,
+						sensor_3: telemetriaData.sensor_3 !== undefined ? telemetriaData.sensor_3 : cruce.sensor_3,
+						sensor_4: telemetriaData.sensor_4 !== undefined ? telemetriaData.sensor_4 : cruce.sensor_4,
+						ultimaActividad: telemetriaData.timestamp || new Date().toISOString(),
+						telemetria: telemetriaData,
+					}
+				}
+				return cruce
+			}))
+			setLastUpdate(new Date())
+		}
+
+		/*
+		// Handler para actualización de sensores (NO IMPLEMENTADO EN BACKEND)
+		const handleSensoresUpdated = (data) => {
+			if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+				console.log('🔌 Sensores actualizados:', data)
+			}
+			const cruceId = data.cruce || data.id_cruce
+			if (!cruceId) return
+
+			const sensores = Array.isArray(data.sensores) ? data.sensores : [data]
+			const sensoresActivos = sensores.filter(s => s.activo !== false).length
+
+			setCruces(prev => prev.map(cruce => {
+				if (cruce.id_cruce === cruceId) {
+					return {
+						...cruce,
+						sensores: sensores,
+						sensoresActivos: sensoresActivos,
+					}
+				}
+				return cruce
+			}))
+			setLastUpdate(new Date())
+		}
+		*/
+
+		// Handler para nuevas alertas
+		const handleNewAlerta = (alertaData) => {
+			if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+				console.log('⚠️ Nueva alerta:', alertaData)
+			}
+			const cruceId = alertaData.cruce || alertaData.id_cruce
+			if (!cruceId) return
+
+			setCruces(prev => prev.map(cruce => {
+				if (cruce.id_cruce === cruceId) {
+					const alertasActuales = cruce.alertas || []
+					const nuevaAlerta = {
+						...alertaData,
+						resolved: false,
+					}
+					return {
+						...cruce,
+						alertas: [nuevaAlerta, ...alertasActuales],
+						alertasActivas: (cruce.alertasActivas || 0) + 1,
+					}
+				}
+				return cruce
+			}))
+			setLastUpdate(new Date())
+		}
+
+		// Handler para alertas resueltas
+		const handleAlertaResolved = (alertaData) => {
+			if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+				console.log('✅ Alerta resuelta:', alertaData)
+			}
+			const cruceId = alertaData.cruce || alertaData.id_cruce
+			if (!cruceId) return
+
+			setCruces(prev => prev.map(cruce => {
+				if (cruce.id_cruce === cruceId) {
+					const alertasActualizadas = (cruce.alertas || []).map(alerta => 
+						alerta.id === alertaData.id ? { ...alerta, resolved: true } : alerta
+					)
+					return {
+						...cruce,
+						alertas: alertasActualizadas,
+						alertasActivas: Math.max(0, (cruce.alertasActivas || 0) - 1),
+					}
+				}
+				return cruce
+			}))
+			setLastUpdate(new Date())
+		}
+
+		// Registrar todos los listeners (SOLO eventos implementados en backend)
+		socketEvents.onConnected(handleConnected)
+		socketEvents.onSubscribed(handleSubscribed)
+		socketEvents.onJoinedRoom(handleJoinedRoom)
+		socketEvents.onNotification(handleNotification)
+		socketEvents.onDashboardUpdate(handleDashboardUpdate)
+		
+		// ⚠️ Eventos comentados porque NO están implementados en el backend:
+		// socketEvents.onCruceCreated(handleCruceCreated)
+		// socketEvents.onCruceUpdated(handleCruceUpdated)
+		// socketEvents.onCruceDeleted(handleCruceDeleted)
+		// socketEvents.onCrucesListUpdated(handleCrucesListUpdated)
+		// socketEvents.onSensoresUpdated(handleSensoresUpdated)
+		
+		// ✅ CRÍTICO: Listener para 'cruce_update' (evento principal emitido a salas específicas)
+		socketEvents.onCruceUpdate(handleCruceUpdate)
+		socketEvents.onNewTelemetria(handleTelemetriaUpdated)
+		socketEvents.onNewAlerta(handleNewAlerta)
+		socketEvents.onAlertaResolved(handleAlertaResolved)
+		
+		// Handler para eventos de barrera (guardado en variable para cleanup)
+		const handleBarrierEvent = (barrierData) => {
+			if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+				console.log('🚧 Evento de barrera:', barrierData)
+			}
+			// Actualizar estado de barrera en el cruce correspondiente
+			const cruceId = barrierData.cruce || barrierData.id_cruce
+			if (cruceId) {
+				setCruces(prev => prev.map(cruce => {
+					if (cruce.id_cruce === cruceId) {
+						return {
+							...cruce,
+							barrier_state: barrierData.barrier_status || barrierData.event_type,
+							ultimaActividad: barrierData.timestamp || new Date().toISOString(),
+						}
+					}
+					return cruce
+				}))
+				setLastUpdate(new Date())
+			}
+		}
+		
+		socketEvents.onBarrierEvent(handleBarrierEvent)
+
+		// Cleanup: remover todos los listeners
+		// IMPORTANTE: Según documentación Socket.IO, debemos remover listeners para evitar memory leaks
+		// NOTA: Como los handlers usan wrappers internos, usamos removeAllListeners() para cada evento
+		return () => {
+			const socket = getSocket()
+			if (socket) {
+				// Remover todos los listeners de cada evento específico
+				// Esto es más seguro que intentar hacer match de callbacks con wrappers
+				socketEvents.removeAllListeners('connected')
+				socketEvents.removeAllListeners('subscribed')
+				socketEvents.removeAllListeners('joined_room')
+				socketEvents.removeAllListeners('notification')
+				socketEvents.removeAllListeners('dashboard_update')
+				socketEvents.removeAllListeners('cruce_created')
+				socketEvents.removeAllListeners('cruce_updated')
+				socketEvents.removeAllListeners('cruce_update')  // ✅ Agregar cleanup para cruce_update
+				socketEvents.removeAllListeners('cruce_deleted')
+				socketEvents.removeAllListeners('cruces_list_updated')
+				socketEvents.removeAllListeners('new_telemetria')
+				socketEvents.removeAllListeners('sensores_updated')
+				socketEvents.removeAllListeners('new_alerta')
+				socketEvents.removeAllListeners('alerta_resolved')
+				socketEvents.removeAllListeners('barrier_event')
+			}
+		}
+	}, [user])
+
+	// Función helper para transformar datos de cruce desde el backend
+	const transformCruceData = (cruceData) => {
+		// Si ya está transformado, retornarlo
+		if (cruceData.id_cruce) {
+			return cruceData
+		}
+
+		// Transformar desde formato del backend
+		const telemetria = cruceData.telemetria || cruceData.ultima_telemetria
+		const batteryVoltage = telemetria?.battery_voltage || 0
+		const bateriaPorcentaje = batteryVoltage > 0 
+			? Math.min(100, Math.max(0, ((batteryVoltage - 10) / (14.4 - 10)) * 100))
+			: 0
+
+		const sensores = cruceData.sensores || []
+		const sensoresActivos = sensores.filter(s => s.activo !== false).length
+
+		return {
+			id_cruce: cruceData.id || cruceData.id_cruce,
+			nombre: cruceData.nombre,
+			ubicacion: cruceData.ubicacion,
+			estado: cruceData.estado || 'ACTIVO',
+			coordenadas: {
+				lat: cruceData.coordenadas_lat || 0,
+				lng: cruceData.coordenadas_lng || 0,
+			},
+			bateria: Math.round(bateriaPorcentaje),
+			voltage: telemetria?.barrier_voltage || 0,
+			battery_voltage: telemetria?.battery_voltage || 0,
+			temperature: telemetria?.temperature || 0,
+			barrier_state: telemetria?.barrier_status || null,
+			signal_strength: telemetria?.signal_strength || 0,
+			rssi: telemetria?.signal_strength || 0,
+			sensor_1: telemetria?.sensor_1 || null,
+			sensor_2: telemetria?.sensor_2 || null,
+			sensor_3: telemetria?.sensor_3 || null,
+			sensor_4: telemetria?.sensor_4 || null,
+			ultimaActividad: telemetria?.timestamp || cruceData.updated_at || cruceData.created_at,
+			sensores: sensores,
+			sensoresActivos: sensoresActivos,
+			alertas: cruceData.alertas || [],
+			alertasActivas: (cruceData.alertas || []).filter(a => !a.resolved).length,
+			...cruceData,
+			telemetria: telemetria,
+		}
+	}
 
 	// Funciones CRUD para cruces
+	// Nota: No recargamos datos manualmente, Socket.IO se encargará de actualizar el estado
 	const agregarCruce = async (nuevoCruce) => {
 		try {
 			const cruceCreado = await createCruce({
@@ -476,14 +887,19 @@ export function DataProvider({ children }) {
 				coordenadas_lat: nuevoCruce.coordenadas?.lat,
 				coordenadas_lng: nuevoCruce.coordenadas?.lng,
 				estado: nuevoCruce.estado || 'ACTIVO',
+				responsable_nombre: nuevoCruce.responsable_nombre,
+				responsable_telefono: nuevoCruce.responsable_telefono,
+				responsable_email: nuevoCruce.responsable_email,
+				responsable_empresa: nuevoCruce.responsable_empresa,
+				responsable_horario: nuevoCruce.responsable_horario,
 			})
 			
-			// Recargar datos después de crear
-			await loadESP32Data()
-			agregarLog('CREATE_CRUCE', `Creado nuevo cruce: ${nuevoCruce.nombre}`)
+			// Socket.IO emitirá 'cruce_created' y actualizará el estado automáticamente
+			// Solo agregamos el log, no recargamos datos
+			agregarLog()
 			return cruceCreado
 		} catch (error) {
-			agregarLog('ERROR', `Error al crear cruce: ${error.message}`)
+			agregarLog()
 			throw error
 		}
 	}
@@ -496,64 +912,249 @@ export function DataProvider({ children }) {
 				coordenadas_lat: datosActualizados.coordenadas?.lat,
 				coordenadas_lng: datosActualizados.coordenadas?.lng,
 				estado: datosActualizados.estado,
+				responsable_nombre: datosActualizados.responsable_nombre,
+				responsable_telefono: datosActualizados.responsable_telefono,
+				responsable_email: datosActualizados.responsable_email,
+				responsable_empresa: datosActualizados.responsable_empresa,
+				responsable_horario: datosActualizados.responsable_horario,
 			})
 			
-			// Recargar datos después de actualizar
-			await loadESP32Data()
-			agregarLog('UPDATE_CRUCE', `Actualizado cruce ID: ${id}`)
+			// Socket.IO emitirá 'cruce_updated' y actualizará el estado automáticamente
+			// Solo agregamos el log, no recargamos datos
+			agregarLog()
 			return cruceActualizado
 		} catch (error) {
-			agregarLog('ERROR', `Error al actualizar cruce: ${error.message}`)
+			agregarLog()
 			throw error
 		}
 	}
 
 	const eliminarCruce = async (id) => {
 		try {
-			const cruce = cruces.find(c => c.id_cruce === id)
 			await deleteCruce(id)
 			
-			// Recargar datos después de eliminar
-			await loadESP32Data()
-			agregarLog('DELETE_CRUCE', `Eliminado cruce: ${cruce?.nombre || id}`)
+			// Socket.IO emitirá 'cruce_deleted' y actualizará el estado automáticamente
+			// Solo agregamos el log, no recargamos datos
+			agregarLog()
 		} catch (error) {
-			agregarLog('ERROR', `Error al eliminar cruce: ${error.message}`)
+			agregarLog()
 			throw error
 		}
 	}
 
-	// Funciones CRUD para usuarios
-	const agregarUsuario = (nuevoUsuario) => {
-		const id = Math.max(...usuarios.map(u => u.id)) + 1
-		const usuario = { ...nuevoUsuario, id }
-		setUsuarios([...usuarios, usuario])
-		agregarLog('CREATE_USER', `Creado nuevo usuario: ${nuevoUsuario.email}`)
-	}
-
-	const actualizarUsuario = (id, datosActualizados) => {
-		setUsuarios(usuarios.map(usuario => 
-			usuario.id === id ? { ...usuario, ...datosActualizados } : usuario
-		))
-		agregarLog('UPDATE_USER', `Actualizado usuario ID: ${id}`)
-	}
-
-	const eliminarUsuario = (id) => {
-		const usuario = usuarios.find(u => u.id === id)
-		setUsuarios(usuarios.filter(u => u.id !== id))
-		agregarLog('DELETE_USER', `Eliminado usuario: ${usuario?.email || id}`)
-	}
-
-	// Función para agregar logs
-	const agregarLog = (accion, detalle, ip = '192.168.1.100') => {
-		const nuevoLog = {
-			id: logs.length + 1,
-			fecha: new Date().toISOString().replace('T', ' ').split('.')[0],
-			usuario: user?.nombre || 'Sistema',
-			accion,
-			detalle,
-			ip
+	// Función para cargar usuarios del backend
+	const loadUsuarios = async () => {
+		if (!isAuthenticated()) return
+		
+		// Prevenir llamadas concurrentes
+		if (isLoadingUsuariosRef.current) {
+			if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+				console.log('⏸️ Carga de usuarios ya en progreso, omitiendo...')
+			}
+			return
 		}
-		setLogs([nuevoLog, ...logs])
+		
+		isLoadingUsuariosRef.current = true
+		setIsLoadingUsuarios(true)
+		setUsuariosError(null)
+		
+		try {
+			const response = await usuariosAPI.getAll()
+			const usuariosList = response.results || response || []
+			
+			// Normalizar datos de usuarios según el modelo del backend
+			const usuariosNormalizados = usuariosList.map(usuario => ({
+				id: usuario.id,
+				nombre: usuario.full_name || `${usuario.first_name || ''} ${usuario.last_name || ''}`.trim() || usuario.username || 'Sin nombre',
+				email: usuario.email || '',
+				username: usuario.username || '',
+				first_name: usuario.first_name || '',
+				last_name: usuario.last_name || '',
+				rol: usuario.profile?.role || usuario.rol || usuario.role || 'OBSERVER',
+				estado: usuario.profile?.is_active !== undefined 
+					? (usuario.profile.is_active ? 'ACTIVO' : 'INACTIVO')
+					: (usuario.is_active !== undefined ? (usuario.is_active ? 'ACTIVO' : 'INACTIVO') : 'ACTIVO'),
+				ultimoAcceso: usuario.profile?.last_login || usuario.last_login || usuario.date_joined || 'N/A',
+				permisos: usuario.profile?.permissions || usuario.permisos || usuario.permissions || ['READ'],
+				date_joined: usuario.date_joined,
+				profile: usuario.profile,
+				...usuario
+			}))
+			
+			setUsuarios(usuariosNormalizados)
+			
+			if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+				console.log(`✅ Usuarios cargados: ${usuariosNormalizados.length}`)
+			}
+		} catch (error) {
+			console.error('Error al cargar usuarios:', error)
+			setUsuariosError(error.message || 'Error al cargar usuarios')
+			toast.error('Error al cargar usuarios del sistema')
+			// Mantener array vacío en caso de error
+			setUsuarios([])
+		} finally {
+			setIsLoadingUsuarios(false)
+			isLoadingUsuariosRef.current = false
+		}
+	}
+
+	// Funciones CRUD para usuarios (conectadas al backend)
+	const agregarUsuario = async (nuevoUsuario) => {
+		try {
+			setIsLoadingUsuarios(true)
+			
+			// Preparar datos para el backend según el modelo User
+			const datosUsuario = {
+				username: nuevoUsuario.username || nuevoUsuario.email?.split('@')[0] || `user_${Date.now()}`,
+				email: nuevoUsuario.email,
+				first_name: nuevoUsuario.first_name || nuevoUsuario.nombre?.split(' ')[0] || '',
+				last_name: nuevoUsuario.last_name || nuevoUsuario.nombre?.split(' ').slice(1).join(' ') || '',
+				password: nuevoUsuario.password || 'TempPassword123!', // El backend requiere password
+				profile: {
+					role: nuevoUsuario.rol || 'OBSERVER',
+					is_active: nuevoUsuario.estado === 'ACTIVO' || nuevoUsuario.estado === true
+				},
+				...nuevoUsuario
+			}
+			
+			const usuarioCreado = await usuariosAPI.create(datosUsuario)
+			
+			// Recargar lista de usuarios
+			await loadUsuarios()
+			
+			toast.success(`Usuario ${nuevoUsuario.email} creado exitosamente`)
+			
+			// El log se creará automáticamente en el backend
+			return usuarioCreado
+		} catch (error) {
+			console.error('Error al crear usuario:', error)
+			const errorMsg = error.response?.data?.detail || error.response?.data?.message || error.message || 'Error al crear usuario'
+			toast.error(errorMsg)
+			throw error
+		} finally {
+			setIsLoadingUsuarios(false)
+		}
+	}
+
+	const actualizarUsuario = async (id, datosActualizados) => {
+		try {
+			setIsLoadingUsuarios(true)
+			
+			// Preparar datos para el backend según el modelo User
+			const datosUpdate = {
+				email: datosActualizados.email,
+				first_name: datosActualizados.first_name || datosActualizados.nombre?.split(' ')[0] || '',
+				last_name: datosActualizados.last_name || datosActualizados.nombre?.split(' ').slice(1).join(' ') || '',
+				profile: {
+					role: datosActualizados.rol || datosActualizados.profile?.role,
+					is_active: datosActualizados.estado === 'ACTIVO' || datosActualizados.estado === true || datosActualizados.profile?.is_active
+				},
+				...datosActualizados
+			}
+			
+			await usuariosAPI.update(id, datosUpdate)
+			
+			// Recargar lista de usuarios
+			await loadUsuarios()
+			
+			toast.success('Usuario actualizado exitosamente')
+			
+			// El log se creará automáticamente en el backend
+		} catch (error) {
+			console.error('Error al actualizar usuario:', error)
+			const errorMsg = error.response?.data?.detail || error.response?.data?.message || error.message || 'Error al actualizar usuario'
+			toast.error(errorMsg)
+			throw error
+		} finally {
+			setIsLoadingUsuarios(false)
+		}
+	}
+
+	const eliminarUsuario = async (id) => {
+		try {
+			setIsLoadingUsuarios(true)
+			
+		const usuario = usuarios.find(u => u.id === id)
+			
+			await usuariosAPI.delete(id)
+			
+			// Recargar lista de usuarios
+			await loadUsuarios()
+			
+			toast.success(`Usuario ${usuario?.email || id} eliminado exitosamente`)
+			
+			// El log se creará automáticamente en el backend
+		} catch (error) {
+			console.error('Error al eliminar usuario:', error)
+			const errorMsg = error.response?.data?.detail || error.response?.data?.message || error.message || 'Error al eliminar usuario'
+			toast.error(errorMsg)
+			throw error
+		} finally {
+			setIsLoadingUsuarios(false)
+		}
+	}
+
+	// Función para cargar logs del backend
+	const loadLogs = useCallback(async (params = {}) => {
+		if (!isAuthenticated()) return
+		
+		// Prevenir llamadas concurrentes
+		if (isLoadingLogsRef.current) {
+			if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+				console.log('⏸️ Carga de logs ya en progreso, omitiendo...')
+			}
+			return
+		}
+		
+		isLoadingLogsRef.current = true
+		setIsLoadingLogs(true)
+		setLogsError(null)
+		
+		try {
+			const response = await logsAPI.getAll({
+				page_size: params.page_size || 100, // Cargar últimos 100 logs por defecto
+				ordering: '-fecha', // Más recientes primero
+				...params
+			})
+			
+			const logsList = response.results || response || []
+			
+			// Normalizar datos de logs
+			const logsNormalizados = logsList.map(log => ({
+				id: log.id || log.id_log,
+				fecha: log.fecha || log.timestamp || log.created_at || new Date().toISOString(),
+				usuario: log.usuario || log.user || log.usuario_nombre || 'Sistema',
+				accion: log.accion || log.action || log.tipo || 'UNKNOWN',
+				detalle: log.detalle || log.detail || log.mensaje || log.message || '',
+				ip: log.ip || log.ip_address || log.ipAddress || 'N/A',
+				...log
+			}))
+			
+			setLogs(logsNormalizados)
+			
+			if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+				console.log(`✅ Logs cargados: ${logsNormalizados.length}`)
+			}
+		} catch (error) {
+			console.error('Error al cargar logs:', error)
+			setLogsError(error.message || 'Error al cargar logs')
+			// No mostrar toast para logs ya que puede ser molesto
+			// Mantener array vacío en caso de error
+			setLogs([])
+		} finally {
+			setIsLoadingLogs(false)
+			isLoadingLogsRef.current = false
+		}
+	}, []) // Array vacío porque no depende de ningún estado que cambie
+
+	// Función para agregar logs (ahora solo para logs locales, el backend los crea automáticamente)
+	const agregarLog = () => {
+		// Los logs se crean automáticamente en el backend
+		// Esta función solo actualiza la lista local si es necesario
+		// Recargar logs después de un tiempo para ver el nuevo log
+		setTimeout(() => {
+			loadLogs()
+		}, 1000)
 	}
 
 	// Función de login con persistencia
@@ -565,14 +1166,14 @@ export function DataProvider({ children }) {
 			const isAdminUser = response.user?.profile?.role === 'ADMIN' || response.user?.profile?.role === 'MAINTENANCE'
 			setIsAdmin(isAdminUser)
 			
-			agregarLog('LOGIN', 'Inicio de sesión exitoso')
+			agregarLog()
 			
-			// Recargar datos después de login
-			await loadESP32Data()
+			// Socket.IO se conectará automáticamente y cargará los datos iniciales
+			// No necesitamos llamar a loadESP32Data() aquí, el useEffect lo hará
 			
 			return true
 		} catch (error) {
-			agregarLog('ERROR', `Error al iniciar sesión: ${error.message}`)
+			agregarLog()
 			throw error
 		}
 	}
@@ -583,7 +1184,7 @@ export function DataProvider({ children }) {
 		} catch (error) {
 			console.warn('Error al cerrar sesión en el servidor:', error)
 		} finally {
-			agregarLog('LOGOUT', 'Cierre de sesión')
+			agregarLog()
 			setUser(null)
 			setIsAdmin(false)
 			setCruces([])
@@ -612,15 +1213,21 @@ export function DataProvider({ children }) {
 		isAdmin,
 		stats,
 		isLoading,
+		isLoadingUsuarios,
+		isLoadingLogs,
 		isESP32Connected,
 		lastUpdate,
 		error,
+		usuariosError,
+		logsError,
 		agregarCruce,
 		actualizarCruce,
 		eliminarCruce,
 		agregarUsuario,
 		actualizarUsuario,
 		eliminarUsuario,
+		loadUsuarios,
+		loadLogs,
 		setConfiguracion,
 		login,
 		logout,

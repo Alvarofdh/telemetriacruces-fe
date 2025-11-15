@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useData } from '../contexts/DataContext'
+import { useData } from '../hooks/useData'
 import { useMetaTags } from '../hooks/useMetaTags'
+import { getSocket } from '../services/socket'
 import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
@@ -85,7 +86,9 @@ export function CruceDetail() {
 	const { cruces } = useData()
 	const [cruce, setCruce] = useState(null)
 	const [activeTab, setActiveTab] = useState('general')
+	const socket = getSocket()
 
+	// Cargar datos iniciales del cruce
 	useEffect(() => {
 		const cruceData = cruces.find(c => c.id_cruce === parseInt(id))
 		if (cruceData) {
@@ -97,6 +100,84 @@ export function CruceDetail() {
 			setCruce({ ...cruceData, ...datosExtra })
 		}
 	}, [id, cruces])
+	
+	// ✅ CORRECCIÓN CRÍTICA: Suscribirse cuando socket se conecta (incluso si el componente ya estaba montado)
+	useEffect(() => {
+		if (!socket || !id) {
+			return
+		}
+		
+		const cruceId = parseInt(id)
+		const cruceRoom = `cruce_${cruceId}`
+		
+		// Función para suscribirse y configurar listeners
+		const setupSocketListeners = () => {
+			if (!socket.connected) {
+				return
+			}
+			
+			console.log(`📡 [CruceDetail] Configurando listeners para cruce ${cruceId}`)
+			
+			// ✅ CRÍTICO: Suscribirse a eventos Y unirse a la sala
+			console.log(`📡 [CruceDetail] Suscribiéndose a eventos: ${cruceRoom}`)
+			socket.emit('subscribe', { events: [cruceRoom] })
+			
+			// ✅ CRÍTICO: Unirse a la sala de Socket.IO (para que el backend vea al cliente)
+			console.log(`🚪 [CruceDetail] Uniéndose a sala de Socket.IO: ${cruceRoom}`)
+			socket.emit('join_room', { room: cruceRoom })
+		}
+		
+		// Listener para actualización de cruce
+		const handleCruceUpdate = (data) => {
+			console.log('🔄 [CruceDetail] Evento cruce_update recibido:', data)
+			const cruceInfo = data.data || data
+			
+			// Verificar si es el cruce actual
+			if (cruceInfo && (cruceInfo.id === cruceId || cruceInfo.id_cruce === cruceId)) {
+				console.log(`✅ [CruceDetail] Actualizando cruce ${cruceId} en tiempo real`)
+				
+				// Actualizar el estado del cruce manteniendo los datos extra
+				setCruce(prevCruce => ({
+					...prevCruce,
+					...cruceInfo,
+					// Mantener los datos históricos si existen
+					historicoTrafico: prevCruce?.historicoTrafico || [],
+					sensores: prevCruce?.sensores || [],
+					configuracion: prevCruce?.configuracion || {}
+				}))
+			}
+		}
+		
+		// Si ya está conectado, configurar inmediatamente
+		if (socket.connected) {
+			setupSocketListeners()
+		}
+		
+		// ✅ CRÍTICO: Registrar listener para cuando el socket se conecte (reconexión o conexión tardía)
+		const handleConnect = () => {
+			console.log('🔌 [CruceDetail] Socket conectado, configurando listeners...')
+			setupSocketListeners()
+		}
+		
+		// Registrar listeners
+		socket.on('connect', handleConnect)
+		socket.on('connected', handleConnect) // Evento personalizado del backend
+		socket.on('cruce_update', handleCruceUpdate)
+		
+		console.log(`✅ [CruceDetail] Listeners registrados para cruce ${cruceId}`)
+		
+		// Cleanup: remover listeners al desmontar o cambiar de cruce
+		return () => {
+			console.log(`🧹 [CruceDetail] Limpiando listeners para cruce ${cruceId}`)
+			socket.off('connect', handleConnect)
+			socket.off('connected', handleConnect)
+			socket.off('cruce_update', handleCruceUpdate)
+			if (socket.connected) {
+				socket.emit('unsubscribe', { events: [cruceRoom] })
+				socket.emit('leave_room', { room: cruceRoom })
+			}
+		}
+	}, [socket, id])
 
 	// Actualizar meta tags dinámicamente
 	useMetaTags({
@@ -247,11 +328,15 @@ export function CruceDetail() {
 							<div>
 								<p className="text-sm font-medium text-gray-600 dark:text-gray-400">Temperatura</p>
 								<p className="text-2xl font-bold text-gray-900 dark:text-white">
-									{cruce.temperature ? `${cruce.temperature?.toFixed(1)}°C` : `${cruce.velocidadPromedio} km/h`}
+									{cruce.temperature !== undefined && cruce.temperature !== null 
+										? `${cruce.temperature.toFixed(1)}°C` 
+										: cruce.velocidadPromedio !== undefined && cruce.velocidadPromedio !== null
+										? `${cruce.velocidadPromedio} km/h`
+										: 'N/A'}
 								</p>
-								{cruce.solar_power !== undefined && (
+								{cruce.solar_power !== undefined && cruce.solar_power !== null && (
 									<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-										☀️ {cruce.solar_power?.toFixed(1)}W
+										☀️ {cruce.solar_power.toFixed(1)}W
 									</p>
 								)}
 							</div>

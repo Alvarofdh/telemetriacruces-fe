@@ -5,7 +5,10 @@ import { http } from './httpClient'
  * Obtener lista de telemetría (paginado)
  * @param {Object} params - Parámetros de paginación y filtros
  * @param {number} params.page - Número de página
+ * @param {number} params.page_size - Tamaño de página
  * @param {number} [params.cruce] - Filtrar por ID de cruce
+ * @param {string} [params.timestamp] - Filtrar por fecha/hora (formato ISO 8601)
+ * @param {string} [params.barrier_status] - Filtrar por estado de barrera (UP, DOWN)
  * @returns {Promise<Object>} Lista de telemetría con paginación
  */
 export const getTelemetria = async (params = {}) => {
@@ -13,8 +16,17 @@ export const getTelemetria = async (params = {}) => {
 	if (params.page) {
 		queryParams.append('page', params.page)
 	}
+	if (params.page_size) {
+		queryParams.append('page_size', params.page_size)
+	}
 	if (params.cruce) {
 		queryParams.append('cruce', params.cruce)
+	}
+	if (params.timestamp) {
+		queryParams.append('timestamp', params.timestamp)
+	}
+	if (params.barrier_status) {
+		queryParams.append('barrier_status', params.barrier_status)
 	}
 	
 	const queryString = queryParams.toString()
@@ -96,4 +108,30 @@ export const deleteTelemetria = async (id) => {
  */
 export const sendESP32Telemetria = async (telemetriaData) => {
 	return await http.post('/api/esp32/telemetria', telemetriaData)
+}
+
+/**
+ * Exportar telemetría a CSV
+ * @param {Object} params - Parámetros de filtrado
+ * @param {number} [params.cruce] - Filtrar por ID de cruce
+ * @param {string} [params.timestamp] - Filtrar por fecha/hora
+ * @param {string} [params.barrier_status] - Filtrar por estado de barrera
+ * @returns {Promise<Blob>} Archivo CSV
+ */
+export const exportTelemetria = async (params = {}) => {
+	const queryParams = new URLSearchParams()
+	if (params.cruce) {
+		queryParams.append('cruce', params.cruce)
+	}
+	if (params.timestamp) {
+		queryParams.append('timestamp', params.timestamp)
+	}
+	if (params.barrier_status) {
+		queryParams.append('barrier_status', params.barrier_status)
+	}
+	
+	const queryString = queryParams.toString()
+	const endpoint = `/api/telemetria/exportar/${queryString ? `?${queryString}` : ''}`
+	
+	return await http.get(endpoint, { responseType: 'blob' })
 }

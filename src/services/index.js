@@ -8,4 +8,8 @@ export * from './sensores'
 export * from './barrierEvents'
 export * from './notifications'
 export * from './health'
+export * from './api'
+export * from './socket'
+export * from './usuarios'
+export * from './logs'
 

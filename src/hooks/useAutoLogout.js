@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useData } from '../contexts/DataContext'
+import { useData } from './useData'
 
 /**
  * Hook para auto-logout después de inactividad

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useData } from '../contexts/DataContext'
+import { useData } from '../hooks/useData'
 import { sanitizeEmail, isValidEmail } from '../utils/sanitize'
 import { formRateLimiter } from '../utils/rateLimiter'
 

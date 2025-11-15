@@ -1,25 +1,17 @@
 import React, { useState } from 'react'
-import { useData } from '../../contexts/DataContext'
+import { useData } from '../../hooks/useData'
 import { useDebounce } from '../../hooks/useDebounce'
+import CruceForm from '../cruces/CruceForm'
+import CruceDeleteModal from '../cruces/CruceDeleteModal'
+import { crucesAPI } from '../../services/api'
 
 export function CruceManagement() {
   const { cruces, agregarCruce, actualizarCruce, eliminarCruce } = useData()
   const [showForm, setShowForm] = useState(false)
   const [editingCruce, setEditingCruce] = useState(null)
+  const [deletingCruce, setDeletingCruce] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
-
-  const initialForm = {
-    nombre: '',
-    ubicacion: '',
-    estado: 'ACTIVO',
-    bateria: 100,
-    sensoresActivos: 4,
-    responsable: '',
-    telefono: ''
-  }
-
-  const [formData, setFormData] = useState(initialForm)
 
   const filteredCruces = cruces.filter(cruce => {
     const search = debouncedSearchTerm.toLowerCase()
@@ -29,33 +21,32 @@ export function CruceManagement() {
     )
   })
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    const cruceData = {
-      ...formData,
-      ultimaActividad: new Date().toISOString().replace('T', ' ').split('.')[0]
-    }
-
-    if (editingCruce) {
-      actualizarCruce(editingCruce.id_cruce, cruceData)
-    } else {
-      agregarCruce(cruceData)
-    }
-
-    setFormData(initialForm)
+  const handleFormSuccess = async () => {
     setShowForm(false)
     setEditingCruce(null)
+    // Recargar datos desde el contexto o API
+    window.location.reload() // O usar un método de refetch si está disponible
   }
 
   const handleEdit = (cruce) => {
     setEditingCruce(cruce)
-    setFormData(cruce)
     setShowForm(true)
   }
 
-  const handleDelete = (id) => {
-    if (window.confirm('¿Estás seguro de que quieres eliminar este cruce?')) {
-      eliminarCruce(id)
+  const handleDelete = (cruce) => {
+    setDeletingCruce(cruce)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (deletingCruce) {
+      try {
+        await crucesAPI.delete(deletingCruce.id || deletingCruce.id_cruce)
+        eliminarCruce(deletingCruce.id || deletingCruce.id_cruce)
+        setDeletingCruce(null)
+      } catch (error) {
+        console.error('Error al eliminar:', error)
+        alert('Error al eliminar cruce')
+      }
     }
   }
 
@@ -66,11 +57,10 @@ export function CruceManagement() {
         <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Gestión de Cruces</h2>
         <button
           onClick={() => {
-            setFormData(initialForm)
             setEditingCruce(null)
             setShowForm(true)
           }}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors dark:bg-blue-500 dark:hover:bg-blue-600"
         >
           + Nuevo Cruce
         </button>
@@ -117,8 +107,8 @@ export function CruceManagement() {
                 Editar
               </button>
               <button
-                onClick={() => handleDelete(cruce.id_cruce)}
-                className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                onClick={() => handleDelete(cruce)}
+                className="px-3 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
               >
                 Eliminar
               </button>
@@ -130,100 +120,31 @@ export function CruceManagement() {
       {/* Modal del Formulario */}
       {showForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
                 {editingCruce ? 'Editar Cruce' : 'Nuevo Cruce'}
               </h3>
-
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <input
-                  type="text"
-                  placeholder="Nombre del cruce"
-                  required
-                  value={formData.nombre}
-                  onChange={(e) => setFormData({...formData, nombre: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                />
-
-                <input
-                  type="text"
-                  placeholder="Ubicación"
-                  required
-                  value={formData.ubicacion}
-                  onChange={(e) => setFormData({...formData, ubicacion: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                />
-
-                <select
-                  value={formData.estado}
-                  onChange={(e) => setFormData({...formData, estado: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                >
-                  <option value="ACTIVO">Activo</option>
-                  <option value="MANTENIMIENTO">Mantenimiento</option>
-                  <option value="INACTIVO">Inactivo</option>
-                </select>
-
-                <input
-                  type="number"
-                  placeholder="Nivel de batería (%)"
-                  min="0"
-                  max="100"
-                  value={formData.bateria}
-                  onChange={(e) => setFormData({...formData, bateria: parseInt(e.target.value)})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                />
-
-                <input
-                  type="number"
-                  placeholder="Sensores activos"
-                  min="0"
-                  max="4"
-                  value={formData.sensoresActivos}
-                  onChange={(e) => setFormData({...formData, sensoresActivos: parseInt(e.target.value)})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                />
-
-                <input
-                  type="text"
-                  placeholder="Responsable"
-                  value={formData.responsable}
-                  onChange={(e) => setFormData({...formData, responsable: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                />
-
-                <input
-                  type="tel"
-                  placeholder="Teléfono"
-                  value={formData.telefono}
-                  onChange={(e) => setFormData({...formData, telefono: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                />
-
-                <div className="flex justify-end space-x-4 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowForm(false)
-                      setEditingCruce(null)
-                      setFormData(initialForm)
-                    }}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    {editingCruce ? 'Actualizar' : 'Crear'}
-                  </button>
-                </div>
-              </form>
+              <CruceForm
+                cruceId={editingCruce?.id || editingCruce?.id_cruce}
+                onSuccess={handleFormSuccess}
+                onCancel={() => {
+                  setShowForm(false)
+                  setEditingCruce(null)
+                }}
+              />
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de Confirmación de Eliminación */}
+      {deletingCruce && (
+        <CruceDeleteModal
+          cruce={deletingCruce}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setDeletingCruce(null)}
+        />
       )}
     </div>
   )

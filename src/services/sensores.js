@@ -5,7 +5,10 @@ import { http } from './httpClient'
  * Obtener lista de sensores (paginado)
  * @param {Object} params - Parámetros de paginación y filtros
  * @param {number} params.page - Número de página
+ * @param {number} params.page_size - Tamaño de página
  * @param {number} [params.cruce] - Filtrar por ID de cruce
+ * @param {string} [params.tipo] - Filtrar por tipo de sensor (BARRERA, GABINETE, BATERIA, PLC, TEMPERATURA)
+ * @param {boolean} [params.activo] - Filtrar por estado activo
  * @returns {Promise<Object>} Lista de sensores con paginación
  */
 export const getSensores = async (params = {}) => {
@@ -13,8 +16,17 @@ export const getSensores = async (params = {}) => {
 	if (params.page) {
 		queryParams.append('page', params.page)
 	}
+	if (params.page_size) {
+		queryParams.append('page_size', params.page_size)
+	}
 	if (params.cruce) {
 		queryParams.append('cruce', params.cruce)
+	}
+	if (params.tipo) {
+		queryParams.append('tipo', params.tipo)
+	}
+	if (params.activo !== undefined) {
+		queryParams.append('activo', params.activo)
 	}
 	
 	const queryString = queryParams.toString()

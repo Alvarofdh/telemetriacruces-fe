@@ -3,14 +3,26 @@ import { http } from './httpClient'
 
 /**
  * Obtener lista de cruces (paginado)
- * @param {Object} params - Parámetros de paginación
+ * @param {Object} params - Parámetros de paginación y filtros
  * @param {number} params.page - Número de página
+ * @param {string} params.estado - Filtrar por estado (ACTIVO, MANTENIMIENTO, INACTIVO)
+ * @param {string} params.nombre - Buscar por nombre (búsqueda parcial)
+ * @param {string} params.ubicacion - Buscar por ubicación (búsqueda parcial)
  * @returns {Promise<Object>} Lista de cruces con paginación
  */
 export const getCruces = async (params = {}) => {
 	const queryParams = new URLSearchParams()
 	if (params.page) {
 		queryParams.append('page', params.page)
+	}
+	if (params.estado) {
+		queryParams.append('estado', params.estado)
+	}
+	if (params.nombre) {
+		queryParams.append('nombre', params.nombre)
+	}
+	if (params.ubicacion) {
+		queryParams.append('ubicacion', params.ubicacion)
 	}
 	
 	const queryString = queryParams.toString()
@@ -93,7 +105,7 @@ export const getCrucesDashboard = async (params = {}) => {
  * Obtener coordenadas de todos los cruces para el mapa
  * @param {Object} params - Parámetros de paginación
  * @param {number} params.page - Número de página
- * @returns {Promise<Object>} Lista de cruces con coordenadas
+ * @returns {Promise<Object>} Lista de cruces con coordenadas optimizadas para mapa
  */
 export const getCrucesMapa = async (params = {}) => {
 	const queryParams = new URLSearchParams()
@@ -105,5 +117,23 @@ export const getCrucesMapa = async (params = {}) => {
 	const endpoint = `/api/cruces/mapa/${queryString ? `?${queryString}` : ''}`
 	
 	return await http.get(endpoint)
+}
+
+/**
+ * Exportar cruces a CSV
+ * @param {Object} params - Parámetros de filtrado
+ * @param {string} params.estado - Filtrar por estado
+ * @returns {Promise<Blob>} Archivo CSV
+ */
+export const exportCruces = async (params = {}) => {
+	const queryParams = new URLSearchParams()
+	if (params.estado) {
+		queryParams.append('estado', params.estado)
+	}
+	
+	const queryString = queryParams.toString()
+	const endpoint = `/api/cruces/exportar/${queryString ? `?${queryString}` : ''}`
+	
+	return await http.get(endpoint, { responseType: 'blob' })
 }
 

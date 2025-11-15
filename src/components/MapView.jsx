@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet'
-import { useData } from '../contexts/DataContext'
+import { useData } from '../hooks/useData'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 

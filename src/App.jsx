@@ -3,7 +3,8 @@ import React, { lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { ThemeProvider } from './contexts/ThemeContext'
-import { DataProvider, useData } from './contexts/DataContext'
+import { DataProvider } from './contexts/DataContext.jsx'
+import { useData } from './hooks/useData'
 import { Loading } from './components/Loading'
 import ErrorBoundary from './components/ErrorBoundary'
 import { useAPIVerification } from './hooks/useAPIVerification'
@@ -18,6 +19,7 @@ const CruceDetail = lazy(() => import('./components/CruceDetail').then(module =>
 const ThemeToggle = lazy(() => import('./components/ThemeToggle').then(module => ({ default: module.ThemeToggle })))
 const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(module => ({ default: module.AdminDashboard })))
 const LoginPage = lazy(() => import('./components/LoginPage').then(module => ({ default: module.LoginPage })))
+const CruceMonitorPage = lazy(() => import('./components/CruceMonitorPage'))
 
 // Componente para proteger rutas
 function ProtectedRoute({ children }) {
@@ -54,20 +56,20 @@ function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 py-4 sm:py-6">
             <div className="flex items-center space-x-3 sm:space-x-4">
-              <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-blue-600 dark:bg-blue-500 rounded-lg flex-shrink-0">
+              <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-blue-600 dark:bg-blue-500 rounded-lg shrink-0">
                 <svg className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
-              <div className="min-w-0">
-                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white truncate">Sistema de Monitoreo</h1>
-                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 truncate">Cruces Ferroviarios Inteligentes</p>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white break-words leading-tight">Sistema de Monitoreo</h1>
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 break-words leading-tight mt-0.5">Cruces Ferroviarios Inteligentes</p>
               </div>
             </div>
 						<div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
 							{/* Estado de conexión ESP32 */}
 							<div className="flex items-center space-x-2 sm:space-x-3">
-								<div className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full flex-shrink-0 ${isESP32Connected ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}></div>
+								<div className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full shrink-0 ${isESP32Connected ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}></div>
 								<div className="text-left sm:text-right">
 									<p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
 										{isESP32Connected ? 'Conectado' : 'Respaldo'}
@@ -121,7 +123,7 @@ function Dashboard() {
                 <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">Total Cruces</p>
                 <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">{stats.totalCruces}</p>
               </div>
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center flex-shrink-0 ml-2">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center shrink-0 ml-2">
                 <svg className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
@@ -135,7 +137,7 @@ function Dashboard() {
                 <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">Activos</p>
                 <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-green-600 dark:text-green-400">{stats.activos}</p>
               </div>
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center flex-shrink-0 ml-2">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center shrink-0 ml-2">
                 <svg className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -149,7 +151,7 @@ function Dashboard() {
                 <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">Mantenimiento</p>
                 <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-yellow-600 dark:text-yellow-400">{stats.mantenimiento}</p>
               </div>
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-yellow-100 dark:bg-yellow-900 rounded-lg flex items-center justify-center flex-shrink-0 ml-2">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-yellow-100 dark:bg-yellow-900 rounded-lg flex items-center justify-center shrink-0 ml-2">
                 <svg className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" />
                 </svg>
@@ -163,7 +165,7 @@ function Dashboard() {
                 <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">Inactivos</p>
                 <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-red-600 dark:text-red-400">{stats.inactivos}</p>
               </div>
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center flex-shrink-0 ml-2">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center shrink-0 ml-2">
                 <svg className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -177,7 +179,7 @@ function Dashboard() {
                 <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">Alertas Batería</p>
                 <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-orange-600 dark:text-orange-400">{stats.alertasBateria}</p>
               </div>
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center flex-shrink-0 ml-2">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center shrink-0 ml-2">
                 <svg className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
@@ -218,7 +220,7 @@ function RouterContent() {
 	useAutoLogout(envConfig.AUTO_LOGOUT_MINUTES)
 
 	return (
-		<Routes>
+			<Routes>
 				{/* Ruta de login - pública */}
 				<Route 
 					path="/login" 
@@ -239,6 +241,16 @@ function RouterContent() {
 					element={
 						<ProtectedRoute>
 							<CruceDetail />
+						</ProtectedRoute>
+					} 
+				/>
+				<Route 
+					path="/monitor/:id" 
+					element={
+						<ProtectedRoute>
+							<Suspense fallback={<Loading />}>
+								<CruceMonitorPage />
+							</Suspense>
 						</ProtectedRoute>
 					} 
 				/>

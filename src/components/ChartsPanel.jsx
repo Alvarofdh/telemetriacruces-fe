@@ -19,7 +19,7 @@ import {
   PolarArea,
   Scatter
 } from 'react-chartjs-2'
-import { useData } from '../contexts/DataContext'
+import { useData } from '../hooks/useData'
 
 // Registrar todos los componentes de Chart.js
 ChartJS.register(
