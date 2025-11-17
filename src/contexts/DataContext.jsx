@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { createContext, useState, useEffect, useRef, useCallback } from 'react'
 import {
 	checkHealth,
 	getCruces,
@@ -20,7 +20,12 @@ import {
 import { connectSocket, disconnectSocket, socketEvents, getSocket } from '../services/socket'
 import { getAccessToken } from '../services/httpClient'
 import toast from 'react-hot-toast'
-import { DataContext } from './DataContext'
+
+/**
+ * Contexto de datos global de la aplicación
+ * Proporciona acceso a cruces, usuarios, logs, y funciones de gestión
+ */
+export const DataContext = createContext()
 
 export function DataProvider({ children }) {
 	// Estado de autenticación con persistencia en localStorage

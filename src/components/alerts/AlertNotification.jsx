@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { socketEvents } from '../../services/socket';
+import { socketEvents } from '../../../services/socket';
 
 const AlertNotification = ({ token }) => {
 	const [alerts, setAlerts] = useState([]);

@@ -1,17 +1,18 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useData } from '../hooks/useData'
-import { CruceManagement } from './admin/CruceManagement'
-import { UserManagement } from './admin/UserManagement'
-import { SystemLogs } from './admin/SystemLogs'
-import { SystemConfig } from './admin/SystemConfig'
-import { AnalyticsPanel } from './admin/AnalyticsPanel'
-import { MapView } from './MapView'
-import { ChartsPanel } from './ChartsPanel'
-import { ThemeToggle } from './ThemeToggle'
-import { AlertSystem } from './AlertSystem'
-import { HistoricalCharts } from './HistoricalCharts'
-import { ExportData } from './ExportData'
+import { useData } from '../../hooks/useData'
+import { CruceManagement } from './CruceManagement'
+import { UserManagement } from './UserManagement'
+import { SystemLogs } from './SystemLogs'
+import { SystemConfig } from './SystemConfig'
+import { AnalyticsPanel } from './AnalyticsPanel'
+import { MapView } from '../MapView'
+import { ChartsPanel } from '../charts/ChartsPanel'
+import { ThemeToggle } from '../ThemeToggle'
+import { AlertSystem } from '../AlertSystem'
+import { HistoricalCharts } from '../charts/HistoricalCharts'
+import { ExportData } from '../ExportData'
+import { SimulatorPanel } from './SimulatorPanel'
 
 export function AdminDashboard() {
 	const navigate = useNavigate()
@@ -24,6 +25,7 @@ export function AdminDashboard() {
 		{ id: 'alerts', label: 'Sistema de Alertas', icon: 'alert', badge: 'NUEVO' },
 		{ id: 'historical', label: 'Gráficos Históricos', icon: 'timeline', badge: 'NUEVO' },
 		{ id: 'export', label: 'Exportar Datos', icon: 'download', badge: 'NUEVO' },
+		{ id: 'simulator', label: 'Panel de Simulación', icon: 'simulator', badge: 'DEMO' },
 		{ id: 'cruces', label: 'Gestión de Cruces', icon: 'location' },
 		{ id: 'usuarios', label: 'Gestión de Usuarios', icon: 'users' },
 		{ id: 'map', label: 'Mapa Interactivo', icon: 'map' },
@@ -53,6 +55,12 @@ export function AdminDashboard() {
 			download: (
 				<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+				</svg>
+			),
+			simulator: (
+				<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+					<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
 				</svg>
 			),
 			compare: (
@@ -201,6 +209,8 @@ export function AdminDashboard() {
 				return <HistoricalCharts />
 			case 'export':
 				return <ExportData />
+			case 'simulator':
+				return <SimulatorPanel />
 			case 'cruces':
 				return <CruceManagement />
 			case 'usuarios':

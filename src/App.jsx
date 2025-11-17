@@ -14,10 +14,11 @@ import { useMetaTags } from './hooks/useMetaTags'
 
 // Lazy loading de componentes para mejor performance
 const CrossingList = lazy(() => import('./components/CrossingList').then(module => ({ default: module.CrossingList })))
-const AlertPanel = lazy(() => import('./components/AlertPanel').then(module => ({ default: module.AlertPanel })))
+const AlertPanel = lazy(() => import('./components/alerts/AlertPanel').then(module => ({ default: module.AlertPanel })))
 const CruceDetail = lazy(() => import('./components/CruceDetail').then(module => ({ default: module.CruceDetail })))
 const ThemeToggle = lazy(() => import('./components/ThemeToggle').then(module => ({ default: module.ThemeToggle })))
-const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(module => ({ default: module.AdminDashboard })))
+const NotificationPanel = lazy(() => import('./components/NotificationPanel').then(module => ({ default: module.NotificationPanel })))
+const AdminDashboard = lazy(() => import('./components/admin/AdminDashboard').then(module => ({ default: module.AdminDashboard })))
 const LoginPage = lazy(() => import('./components/LoginPage').then(module => ({ default: module.LoginPage })))
 const CruceMonitorPage = lazy(() => import('./components/CruceMonitorPage'))
 
@@ -98,6 +99,10 @@ function Dashboard() {
 										Admin
 									</a>
 								)}
+								
+								<Suspense fallback={<div className="w-10 h-10" />}>
+									<NotificationPanel />
+								</Suspense>
 								
 								<button
 									onClick={handleLogout}

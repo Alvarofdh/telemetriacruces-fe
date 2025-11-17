@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { getSocket } from '../services/socket';
 import { crucesAPI, telemetriaAPI, alertasAPI } from '../services/api';
 import { getBarrierEvents } from '../services/barrierEvents';
-import './CruceMonitor.css';
+import '../assets/styles/CruceMonitor.css';
 
 /**
  * Componente para monitorear un cruce en tiempo real
