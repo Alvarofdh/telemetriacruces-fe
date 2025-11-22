@@ -54,7 +54,8 @@ export function UserManagement() {
     usuariosError,
     agregarUsuario, 
     actualizarUsuario, 
-    eliminarUsuario,
+    desactivarUsuario,
+    activarUsuario,
     loadUsuarios 
   } = useData()
   const [showForm, setShowForm] = useState(false)
@@ -122,14 +123,21 @@ export function UserManagement() {
     setShowForm(true)
   }
 
-  const handleDelete = async (id) => {
-    if (window.confirm('¿Estás seguro de que quieres eliminar este usuario?')) {
+  const handleDeactivate = async (usuario) => {
+    if (window.confirm(`¿Desactivar al usuario ${usuario.email}? Podrás reactivarlo posteriormente.`)) {
       try {
-        await eliminarUsuario(id)
+        await desactivarUsuario(usuario.id)
       } catch (error) {
-        // El error ya se maneja en el DataContext con toast
-        console.error('Error al eliminar usuario:', error)
+        console.error('Error al desactivar usuario:', error)
       }
+    }
+  }
+
+  const handleActivate = async (usuario) => {
+    try {
+      await activarUsuario(usuario.id)
+    } catch (error) {
+      console.error('Error al activar usuario:', error)
     }
   }
 
@@ -416,13 +424,23 @@ export function UserManagement() {
                     <UserIcons.edit className="w-4 h-4" />
                     Editar
                   </button>
-                  <button
-                    onClick={() => handleDelete(usuario.id)}
-                    className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                  >
-                    <UserIcons.trash className="w-4 h-4" />
-                    Eliminar
-                  </button>
+                  {usuario.estado === 'ACTIVO' ? (
+                    <button
+                      onClick={() => handleDeactivate(usuario)}
+                      className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 text-sm font-medium text-orange-600 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
+                    >
+                      <UserIcons.trash className="w-4 h-4" />
+                      Desactivar
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleActivate(usuario)}
+                      className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 text-sm font-medium text-green-600 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                    >
+                      <UserIcons.user className="w-4 h-4" />
+                      Activar
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

@@ -180,6 +180,17 @@ export function DataProvider({ children }) {
 		}
 	]
 
+	const normalizeContactoBackup = (cruce) => ({
+		...cruce,
+		responsable_nombre: cruce.responsable_nombre || cruce.responsable || '',
+		responsable_telefono: cruce.responsable_telefono || cruce.telefono || '',
+		responsable_email: cruce.responsable_email || '',
+		responsable_empresa: cruce.responsable_empresa || '',
+		responsable_horario: cruce.responsable_horario || ''
+	})
+
+	const crucesBackupNormalizados = crucesBackup.map(normalizeContactoBackup)
+
 	// Usuarios del sistema (cargados del backend)
 	const [usuarios, setUsuarios] = useState([])
 	const [isLoadingUsuarios, setIsLoadingUsuarios] = useState(false)
@@ -422,7 +433,7 @@ export function DataProvider({ children }) {
 		} catch (err) {
 			setIsESP32Connected(false)
 			setError('No se pudo conectar con el backend. Usando datos de respaldo.')
-			setCruces(crucesBackup)
+			setCruces(crucesBackupNormalizados)
 			
 			// Rate limiting: solo loguear errores cada 30 segundos
 			const now = Date.now()
@@ -1075,7 +1086,7 @@ export function DataProvider({ children }) {
 		}
 	}
 
-	const eliminarUsuario = async (id) => {
+	const desactivarUsuario = async (id) => {
 		try {
 			setIsLoadingUsuarios(true)
 			
@@ -1086,18 +1097,40 @@ export function DataProvider({ children }) {
 			// Recargar lista de usuarios
 			await loadUsuarios()
 			
-			toast.success(`Usuario ${usuario?.email || id} eliminado exitosamente`)
+			toast.success(`Usuario ${usuario?.email || id} desactivado`)
 			
 			// El log se creará automáticamente en el backend
 		} catch (error) {
-			console.error('Error al eliminar usuario:', error)
-			const errorMsg = error.response?.data?.detail || error.response?.data?.message || error.message || 'Error al eliminar usuario'
+			console.error('Error al desactivar usuario:', error)
+			const errorMsg = error.response?.data?.detail || error.response?.data?.message || error.message || 'Error al desactivar usuario'
 			toast.error(errorMsg)
 			throw error
 		} finally {
 			setIsLoadingUsuarios(false)
 		}
 	}
+
+	const activarUsuario = async (id) => {
+		try {
+			setIsLoadingUsuarios(true)
+			const usuario = usuarios.find(u => u.id === id)
+
+			await usuariosAPI.activate(id)
+
+			await loadUsuarios()
+
+			toast.success(`Usuario ${usuario?.email || id} activado`)
+		} catch (error) {
+			console.error('Error al activar usuario:', error)
+			const errorMsg = error.response?.data?.detail || error.response?.data?.message || error.message || 'Error al activar usuario'
+			toast.error(errorMsg)
+			throw error
+		} finally {
+			setIsLoadingUsuarios(false)
+		}
+	}
+
+	const eliminarUsuario = desactivarUsuario
 
 	// Función para cargar logs del backend
 	const loadLogs = useCallback(async (params = {}) => {
@@ -1230,6 +1263,8 @@ export function DataProvider({ children }) {
 		eliminarCruce,
 		agregarUsuario,
 		actualizarUsuario,
+		desactivarUsuario,
+		activarUsuario,
 		eliminarUsuario,
 		loadUsuarios,
 		loadLogs,

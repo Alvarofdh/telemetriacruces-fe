@@ -144,13 +144,23 @@ export function MapView() {
                           </span>
                         </div>
                         
-                        <div className="pt-2 border-t border-gray-200">
-                          <p className="text-gray-600 text-xs">
+                        <div className="pt-2 border-t border-gray-200 space-y-1 text-xs text-gray-600">
+                          <p>
                             📍 {cruce.ubicacion}
                           </p>
-                          <p className="text-gray-600 text-xs mt-1">
-                            👤 {cruce.responsable}
+                          <p>
+                            👤 {cruce.responsable_nombre || cruce.responsable || 'Sin asignar'}
                           </p>
+                          {(cruce.responsable_telefono || cruce.telefono) && (
+                            <p>
+                              📞 {cruce.responsable_telefono || cruce.telefono}
+                            </p>
+                          )}
+                          {cruce.responsable_empresa && (
+                            <p>
+                              🏢 {cruce.responsable_empresa}
+                            </p>
+                          )}
                         </div>
                         
                         <div className="pt-2">
@@ -234,9 +244,30 @@ export function MapView() {
             <div className="space-y-3">
               <h4 className="font-semibold text-gray-700 dark:text-gray-300">Contacto</h4>
               <div className="space-y-2 text-sm">
-                <div>
-                  <span className="block font-medium">{selectedCruce.responsable}</span>
-                  <span className="text-gray-600 dark:text-gray-400">{selectedCruce.telefono}</span>
+                <div className="space-y-1">
+                  <span className="block font-medium text-gray-900 dark:text-white">
+                    {selectedCruce.responsable_nombre || selectedCruce.responsable || 'Sin asignar'}
+                  </span>
+                  {selectedCruce.responsable_empresa && (
+                    <span className="block text-xs text-gray-600 dark:text-gray-400">
+                      {selectedCruce.responsable_empresa}
+                    </span>
+                  )}
+                  {(selectedCruce.responsable_telefono || selectedCruce.telefono) && (
+                    <span className="block text-gray-600 dark:text-gray-400">
+                      📞 {selectedCruce.responsable_telefono || selectedCruce.telefono}
+                    </span>
+                  )}
+                  {selectedCruce.responsable_email && (
+                    <span className="block text-blue-600 dark:text-blue-400 break-words">
+                      ✉️ {selectedCruce.responsable_email}
+                    </span>
+                  )}
+                  {selectedCruce.responsable_horario && (
+                    <span className="block text-gray-600 dark:text-gray-400">
+                      🕒 {selectedCruce.responsable_horario}
+                    </span>
+                  )}
                 </div>
                 <div className="pt-2">
                   <a 

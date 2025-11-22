@@ -6,6 +6,7 @@ import { getSocket } from '../services/socket'
 import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
+import ResponsableInfo from './contacto/ResponsableInfo'
 
 // Configurar icono personalizado para el marcador
 const createCustomIcon = (estado) => {
@@ -630,25 +631,7 @@ export function CruceDetail() {
 
 						{activeTab === 'contacto' && (
 							<div className="space-y-6">
-								<h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Información de Contacto</h3>
-								<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
-									<div className="space-y-4">
-										<div>
-											<label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Responsable</label>
-											<p className="mt-1 text-sm text-gray-900 dark:text-white">{cruce.responsable || 'N/A'}</p>
-										</div>
-										<div>
-											<label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Teléfono</label>
-											<p className="mt-1 text-sm text-gray-900 dark:text-white">{cruce.telefono || 'N/A'}</p>
-										</div>
-										{cruce.contacto?.email && (
-											<div>
-												<label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Correo Electrónico</label>
-												<p className="mt-1 text-sm text-gray-900 dark:text-white">{cruce.contacto.email}</p>
-											</div>
-										)}
-									</div>
-								</div>
+								<ResponsableInfo cruce={cruce} />
 							</div>
 						)}
 					</div>

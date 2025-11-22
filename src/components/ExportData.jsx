@@ -10,6 +10,18 @@ export function ExportData() {
 	const [selectedFormat, setSelectedFormat] = useState('csv')
 	const [selectedData, setSelectedData] = useState('cruces')
 
+	const getContactoResumen = (cruce) => {
+		const partes = [
+			cruce.responsable_nombre || cruce.responsable,
+			cruce.responsable_empresa,
+			cruce.responsable_telefono || cruce.telefono,
+			cruce.responsable_email,
+			cruce.responsable_horario
+		].filter(Boolean)
+
+		return partes.length > 0 ? partes.join(' • ') : 'Sin asignar'
+	}
+
 	// Exportar a CSV
 	const exportToCSV = (data, filename) => {
 		if (!data || data.length === 0) {
@@ -125,12 +137,12 @@ export function ExportData() {
 			`${cruce.bateria}%`,
 			`${cruce.sensoresActivos}/4`,
 			cruce.ubicacion,
-			cruce.responsable || 'N/A'
+			getContactoResumen(cruce)
 		])
 
 		doc.autoTable({
 			startY: yPos + 5,
-			head: [['Nombre', 'Estado', 'Batería', 'Sensores', 'Ubicación', 'Responsable']],
+			head: [['Nombre', 'Estado', 'Batería', 'Sensores', 'Ubicación', 'Contacto']],
 			body: crucesData,
 			theme: 'striped',
 			headStyles: { fillColor: [37, 99, 235] },
@@ -225,8 +237,11 @@ export function ExportData() {
 						'Sensores Activos': c.sensoresActivos,
 						Ubicación: c.ubicacion,
 						'Última Actividad': c.ultimaActividad,
-						Responsable: c.responsable || 'N/A',
-						Teléfono: c.telefono || 'N/A'
+						'Responsable Nombre': c.responsable_nombre || c.responsable || 'Sin asignar',
+						'Responsable Teléfono': c.responsable_telefono || c.telefono || 'N/A',
+						'Responsable Email': c.responsable_email || 'N/A',
+						'Responsable Empresa': c.responsable_empresa || 'N/A',
+						'Horario de Atención': c.responsable_horario || 'N/A'
 					}))
 					filename = 'cruces'
 					break
@@ -265,7 +280,11 @@ export function ExportData() {
 							Batería: `${c.bateria}%`,
 							Sensores: `${c.sensoresActivos}/4`,
 							Ubicación: c.ubicacion,
-							Responsable: c.responsable || 'N/A'
+							'Responsable Nombre': c.responsable_nombre || c.responsable || 'Sin asignar',
+							'Responsable Teléfono': c.responsable_telefono || c.telefono || 'N/A',
+							'Responsable Email': c.responsable_email || 'N/A',
+							'Responsable Empresa': c.responsable_empresa || 'N/A',
+							'Horario de Atención': c.responsable_horario || 'N/A'
 						}))
 					filename = 'alertas'
 					break

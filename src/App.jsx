@@ -14,10 +14,9 @@ import { useMetaTags } from './hooks/useMetaTags'
 
 // Lazy loading de componentes para mejor performance
 const CrossingList = lazy(() => import('./components/CrossingList').then(module => ({ default: module.CrossingList })))
-const AlertPanel = lazy(() => import('./components/alerts/AlertPanel').then(module => ({ default: module.AlertPanel })))
 const CruceDetail = lazy(() => import('./components/CruceDetail').then(module => ({ default: module.CruceDetail })))
 const ThemeToggle = lazy(() => import('./components/ThemeToggle').then(module => ({ default: module.ThemeToggle })))
-const NotificationPanel = lazy(() => import('./components/NotificationPanel').then(module => ({ default: module.NotificationPanel })))
+const NotificationPanel = lazy(() => import('./components/NotificationPanel'))
 const AdminDashboard = lazy(() => import('./components/admin/AdminDashboard').then(module => ({ default: module.AdminDashboard })))
 const LoginPage = lazy(() => import('./components/LoginPage').then(module => ({ default: module.LoginPage })))
 const CruceMonitorPage = lazy(() => import('./components/CruceMonitorPage'))
@@ -99,10 +98,6 @@ function Dashboard() {
 										Admin
 									</a>
 								)}
-								
-								<Suspense fallback={<div className="w-10 h-10" />}>
-									<NotificationPanel />
-								</Suspense>
 								
 								<button
 									onClick={handleLogout}
@@ -204,9 +199,9 @@ function Dashboard() {
           
           {/* Panel de Alertas - Sidebar */}
           <aside className="lg:col-span-1 fade-in order-1 lg:order-2" style={{ animationDelay: '0.2s' }}>
-            <div className="sticky top-4 sm:top-8">
-							<Suspense fallback={<Loading message="Cargando alertas..." />}>
-								<AlertPanel />
+            <div className="sticky top-4 sm:top-8 space-y-4">
+							<Suspense fallback={<Loading message="Cargando notificaciones..." />}>
+								<NotificationPanel />
 							</Suspense>
             </div>
 					</aside>

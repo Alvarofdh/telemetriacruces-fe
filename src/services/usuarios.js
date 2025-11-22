@@ -92,6 +92,20 @@ export const usuariosAPI = {
 	},
 
 	/**
+	 * Reactivar un usuario previamente desactivado
+	 * @param {number|string} id - ID del usuario
+	 * @returns {Promise<Object>} Usuario actualizado
+	 */
+	activate: (id) => {
+		return api.post(`/users/${id}/activate/`)
+			.then(response => response.data)
+			.catch(error => {
+				console.error('Error al activar usuario:', error)
+				throw error
+			})
+	},
+
+	/**
 	 * Cambiar estado de un usuario (activar/desactivar)
 	 * @param {number|string} id - ID del usuario
 	 * @param {string} estado - Nuevo estado (ACTIVO, INACTIVO)

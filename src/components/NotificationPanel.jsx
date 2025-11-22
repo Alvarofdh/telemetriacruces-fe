@@ -1,299 +1,371 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { useData } from '../hooks/useData'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import toast from 'react-hot-toast'
+import { getAlertas } from '../services/alertas'
+import { getNotificationSettings } from '../services/notifications'
+import { getSocket, socketEvents } from '../services/socket'
 
-// Iconos SVG
+const DEFAULT_SETTINGS = {
+	enable_notifications: true,
+	notify_critical_alerts: true,
+	notify_warning_alerts: true,
+	notify_info_alerts: true,
+	notify_barrier_events: true,
+	notify_battery_low: true,
+	notify_communication_lost: true,
+	notify_gabinete_open: true,
+}
+
+const MAX_ITEMS = 30
+const VISIBLE_ITEMS = 3
+
 const NotificationIcons = {
-	info: (className = "w-5 h-5") => (
-		<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+	panel: (
+		<svg className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600 dark:text-orange-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5-5-5h5V3h0z" />
 		</svg>
 	),
-	warning: (className = "w-5 h-5") => (
-		<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	bell: (
+		<svg className="w-12 h-12 mx-auto text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h16" />
+			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 21a3 3 0 01-6 0" />
+		</svg>
+	),
+	critical: (
+		<svg className="w-5 h-5 text-red-500 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" />
 		</svg>
 	),
-	error: (className = "w-5 h-5") => (
-		<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+	warning: (
+		<svg className="w-5 h-5 text-yellow-500 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" />
 		</svg>
 	),
-	success: (className = "w-5 h-5") => (
-		<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+	info: (
+		<svg className="w-5 h-5 text-blue-500 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
 		</svg>
 	),
-	bell: (className = "w-5 h-5") => (
-		<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-		</svg>
-	),
-	close: (className = "w-4 h-4") => (
-		<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-			<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-		</svg>
-	)
+}
+
+const severityConfig = {
+	CRITICAL: {
+		border: 'border-l-red-500 bg-red-50 dark:bg-red-900/20',
+		icon: NotificationIcons.critical,
+		toast: (msg) => toast.error(msg, { icon: '🚨', duration: 5000 }),
+	},
+	WARNING: {
+		border: 'border-l-yellow-500 bg-yellow-50 dark:bg-yellow-900/20',
+		icon: NotificationIcons.warning,
+		toast: (msg) => toast(msg, { icon: '⚠️', duration: 4000 }),
+	},
+	INFO: {
+		border: 'border-l-blue-500 bg-blue-50 dark:bg-blue-900/20',
+		icon: NotificationIcons.info,
+		toast: (msg) => toast.success(msg, { icon: 'ℹ️', duration: 3500 }),
+	},
+}
+
+const normalizeSeverity = (value) => {
+	if (!value) {
+		return 'INFO'
+	}
+	const normalized = value.toUpperCase()
+	if (normalized === 'DANGER') {
+		return 'CRITICAL'
+	}
+	return normalized
+}
+
+const normalizeAlert = (alert) => {
+	const severity = normalizeSeverity(alert.severity)
+	return {
+		id: alert.id,
+		title: alert.type_display || alert.type || 'Alerta',
+		message: alert.description || 'Sin descripción',
+		cruce: alert.cruce_nombre || `Cruce #${alert.cruce}`,
+		timestamp: alert.created_at || new Date().toISOString(),
+		severity,
+		read: !!alert.resolved,
+	}
+}
+
+const normalizeRealtimeNotification = (payload) => {
+	const severity = normalizeSeverity(payload.severity || payload.metadata?.severity)
+	return {
+		id: payload.metadata?.alerta_id || payload.id || crypto.randomUUID(),
+		title: payload.title || payload.metadata?.title || 'Notificación',
+		message: payload.message || payload.metadata?.message || 'Sin mensaje',
+		cruce: payload.cruce || payload.metadata?.cruce_nombre || `Cruce #${payload.cruce_id || '-'}`,
+		timestamp: payload.timestamp || new Date().toISOString(),
+		event: payload.event || payload.type || 'notification',
+		severity,
+		read: false,
+	}
+}
+
+const formatTimestamp = (value) => {
+	if (!value) {
+		return 'Hace unos segundos'
+	}
+	const date = new Date(value)
+	const now = new Date()
+	const diffMinutes = Math.floor((now.getTime() - date.getTime()) / 60000)
+
+	if (diffMinutes < 1) {
+		return 'Hace unos segundos'
+	}
+	if (diffMinutes < 60) {
+		return `Hace ${diffMinutes} min`
+	}
+	const diffHours = Math.floor(diffMinutes / 60)
+	if (diffHours < 24) {
+		return `Hace ${diffHours} h`
+	}
+	return date.toLocaleString('es-ES', {
+		day: '2-digit',
+		month: 'short',
+		hour: '2-digit',
+		minute: '2-digit',
+	})
 }
 
 export function NotificationPanel() {
-	const { cruces } = useData()
-	const [notifications, setNotifications] = useState([])
-	const [isOpen, setIsOpen] = useState(false)
-	const [unreadCount, setUnreadCount] = useState(0)
-	const previousCrucesRef = useRef([])
+	const [alerts, setAlerts] = useState([])
+	const [realtimeNotifications, setRealtimeNotifications] = useState([])
+	const [settings, setSettings] = useState(DEFAULT_SETTINGS)
+	const [isLoadingAlerts, setIsLoadingAlerts] = useState(false)
+	const [mostrarTodas, setMostrarTodas] = useState(false)
 
-	// Detectar cambios en cruces y crear notificaciones
+	const unreadRest = useMemo(() => alerts.filter(alerta => !alerta.read).length, [alerts])
+	const unreadRealtime = useMemo(() => realtimeNotifications.filter(alerta => !alerta.read).length, [realtimeNotifications])
+	const totalUnread = unreadRest + unreadRealtime
+
+	const loadAlerts = useCallback(async () => {
+		setIsLoadingAlerts(true)
+		try {
+			const response = await getAlertas({ resolved: false, page_size: MAX_ITEMS })
+			const lista = (response?.results || response || []).map(normalizeAlert)
+			setAlerts(lista)
+		} catch (error) {
+			toast.error(error.message || 'No se pudieron cargar las alertas')
+		} finally {
+			setIsLoadingAlerts(false)
+		}
+	}, [])
+
+	const loadSettings = useCallback(async () => {
+		try {
+			const response = await getNotificationSettings()
+			setSettings({ ...DEFAULT_SETTINGS, ...response })
+		} catch (error) {
+			toast.error(error.message || 'No se pudo obtener la configuración de notificaciones')
+			setSettings(DEFAULT_SETTINGS)
+		}
+	}, [])
+
 	useEffect(() => {
-		if (previousCrucesRef.current.length === 0) {
-			previousCrucesRef.current = cruces
+		loadAlerts()
+		loadSettings()
+	}, [loadAlerts, loadSettings])
+
+	const shouldProcessNotification = useCallback((payload) => {
+		if (!settings.enable_notifications) {
+			return false
+		}
+		const severity = normalizeSeverity(payload.severity || payload.metadata?.severity)
+		if (severity === 'CRITICAL' && !settings.notify_critical_alerts) return false
+		if (severity === 'WARNING' && !settings.notify_warning_alerts) return false
+		if (severity === 'INFO' && !settings.notify_info_alerts) return false
+
+		const eventName = (payload.event || payload.type || '').toLowerCase()
+		if (eventName.includes('barrier') && !settings.notify_barrier_events) return false
+		if (eventName.includes('battery') && !settings.notify_battery_low) return false
+		if (eventName.includes('communication') && !settings.notify_communication_lost) return false
+		if (eventName.includes('gabinete') && !settings.notify_gabinete_open) return false
+		return true
+	}, [settings])
+
+	useEffect(() => {
+		const socket = getSocket()
+		if (!socket) {
 			return
 		}
 
-		cruces.forEach(cruce => {
-			const previousCruce = previousCrucesRef.current.find(p => p.id_cruce === cruce.id_cruce)
-			if (!previousCruce) return
-
-			// Detectar cambios críticos
-			if (previousCruce.estado !== cruce.estado) {
-				const type = cruce.estado === 'INACTIVO' ? 'error' : cruce.estado === 'MANTENIMIENTO' ? 'warning' : 'success'
-				addNotification({
-					type,
-					title: `Estado de ${cruce.nombre} cambió`,
-					message: `El cruce cambió de ${previousCruce.estado} a ${cruce.estado}`,
-					timestamp: new Date(),
-					cruceId: cruce.id_cruce
-				})
+		const joinNotificationsRoom = () => {
+			if (!settings.enable_notifications) {
+				return
 			}
-
-			if (previousCruce.bateria > 30 && cruce.bateria <= 30) {
-				addNotification({
-					type: 'warning',
-					title: `Batería baja en ${cruce.nombre}`,
-					message: `La batería descendió a ${cruce.bateria}%`,
-					timestamp: new Date(),
-					cruceId: cruce.id_cruce
-				})
-			}
-
-			if (previousCruce.bateria > 20 && cruce.bateria <= 20) {
-				addNotification({
-					type: 'error',
-					title: `Batería crítica en ${cruce.nombre}`,
-					message: `La batería está en ${cruce.bateria}% - Acción requerida`,
-					timestamp: new Date(),
-					cruceId: cruce.id_cruce
-				})
-			}
-
-			if (previousCruce.sensoresActivos > cruce.sensoresActivos && cruce.sensoresActivos < 2) {
-				addNotification({
-					type: 'warning',
-					title: `Falla de sensores en ${cruce.nombre}`,
-					message: `Solo ${cruce.sensoresActivos} sensores activos`,
-					timestamp: new Date(),
-					cruceId: cruce.id_cruce
-				})
-			}
-		})
-
-		previousCrucesRef.current = cruces
-	}, [cruces])
-
-	const addNotification = (notification) => {
-		const newNotification = {
-			id: Date.now(),
-			...notification,
-			read: false
+			socket.emit('join_room', { room: 'notifications' })
 		}
-		setNotifications(prev => [newNotification, ...prev].slice(0, 50)) // Máximo 50 notificaciones
-		setUnreadCount(prev => prev + 1)
-		
-		// Mostrar toast también
-		const toastOptions = {
-			duration: notification.type === 'error' ? 5000 : 4000,
-			icon: notification.type === 'error' ? '🔴' : notification.type === 'warning' ? '⚠️' : '✅'
+
+		if (socket.connected) {
+			joinNotificationsRoom()
 		}
-		
-		if (notification.type === 'error') {
-			toast.error(notification.message, toastOptions)
-		} else if (notification.type === 'warning') {
-			toast(notification.message, { ...toastOptions, icon: '⚠️' })
+		socket.on('connect', joinNotificationsRoom)
+
+		const handleSocketNotification = (payload) => {
+			if (!shouldProcessNotification(payload)) {
+				return
+			}
+			const normalized = normalizeRealtimeNotification(payload)
+			setRealtimeNotifications(prev => [normalized, ...prev].slice(0, MAX_ITEMS))
+
+			const severity = normalized.severity || 'INFO'
+			const severityEntry = severityConfig[severity] || severityConfig.INFO
+			severityEntry.toast(`${normalized.title}: ${normalized.message}`)
+
+			if (payload.event === 'alert_created' || payload.event === 'alerta_resuelta') {
+				loadAlerts()
+			}
+		}
+
+		socketEvents.onNotification(handleSocketNotification)
+
+		return () => {
+			socket.off('connect', joinNotificationsRoom)
+			socket.emit('leave_room', { room: 'notifications' })
+			socketEvents.off('notification', handleSocketNotification)
+		}
+	}, [settings.enable_notifications, shouldProcessNotification, loadAlerts])
+
+	const handleRefreshAlerts = () => {
+		loadAlerts()
+	}
+
+	const handleMarkAsRead = (item) => {
+		if (item.origin === 'rest') {
+			setAlerts(prev => prev.map(alert => alert.id === item.rawId ? { ...alert, read: true } : alert))
 		} else {
-			toast.success(notification.message, toastOptions)
+			setRealtimeNotifications(prev => prev.map(alert => alert.id === item.rawId ? { ...alert, read: true } : alert))
 		}
 	}
 
-	const markAsRead = (id) => {
-		setNotifications(prev => 
-			prev.map(n => n.id === id ? { ...n, read: true } : n)
-		)
-		setUnreadCount(prev => Math.max(0, prev - 1))
+	const combinedAlerts = useMemo(() => {
+		const restItems = alerts.map(alert => ({
+			id: `rest-${alert.id}`,
+			rawId: alert.id,
+			origin: 'rest',
+			message: alert.message,
+			cruce: alert.cruce,
+			timestamp: alert.timestamp,
+			read: alert.read,
+			severity: alert.severity || 'INFO',
+			title: alert.title,
+		}))
+
+		const realtimeItems = realtimeNotifications.map(notification => ({
+			id: `socket-${notification.id}`,
+			rawId: notification.id,
+			origin: 'socket',
+			message: notification.message || notification.title,
+			cruce: notification.cruce,
+			timestamp: notification.timestamp,
+			read: notification.read,
+			severity: notification.severity || 'INFO',
+			title: notification.title,
+		}))
+
+		return [...realtimeItems, ...restItems].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+	}, [alerts, realtimeNotifications])
+
+	const alertasAMostrar = mostrarTodas ? combinedAlerts : combinedAlerts.slice(0, VISIBLE_ITEMS)
+
+	const getAlertaStyles = (severity) => {
+		const config = severityConfig[severity] || severityConfig.INFO
+		return config.border
 	}
 
-	const markAllAsRead = () => {
-		setNotifications(prev => prev.map(n => ({ ...n, read: true })))
-		setUnreadCount(0)
-	}
-
-	const clearAll = () => {
-		setNotifications([])
-		setUnreadCount(0)
-	}
-
-	const getNotificationStyles = (type) => {
-		const styles = {
-			error: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800',
-			warning: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800',
-			success: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800',
-			info: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
-		}
-		return styles[type] || styles.info
-	}
-
-	const getNotificationIcon = (type) => {
-		switch(type) {
-			case 'error':
-				return <NotificationIcons.error className="w-5 h-5 text-red-600 dark:text-red-400" />
-			case 'warning':
-				return <NotificationIcons.warning className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
-			case 'success':
-				return <NotificationIcons.success className="w-5 h-5 text-green-600 dark:text-green-400" />
-			default:
-				return <NotificationIcons.info className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-		}
-	}
-
-	const formatTime = (date) => {
-		const now = new Date()
-		const diff = now - date
-		const minutes = Math.floor(diff / 60000)
-		const hours = Math.floor(minutes / 60)
-		const days = Math.floor(hours / 24)
-
-		if (minutes < 1) return 'Ahora'
-		if (minutes < 60) return `Hace ${minutes} min`
-		if (hours < 24) return `Hace ${hours} h`
-		if (days < 7) return `Hace ${days} d`
-		return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
+	const getAlertaIcon = (severity) => {
+		const config = severityConfig[severity] || severityConfig.INFO
+		return config.icon
 	}
 
 	return (
-		<div className="relative">
-			{/* Botón de notificaciones */}
-			<button
-				onClick={() => setIsOpen(!isOpen)}
-				className="relative p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-				aria-label="Notificaciones"
-			>
-				<NotificationIcons.bell className="w-6 h-6" />
-				{unreadCount > 0 && (
-					<span className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-						{unreadCount > 9 ? '9+' : unreadCount}
-					</span>
-				)}
-			</button>
-
-			{/* Panel de notificaciones */}
-			{isOpen && (
-				<>
-					<div 
-						className="fixed inset-0 z-40"
-						onClick={() => setIsOpen(false)}
-					/>
-					<div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 z-50 max-h-[600px] flex flex-col">
-						{/* Header */}
-						<div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-							<div className="flex items-center gap-2">
-								<NotificationIcons.bell className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-								<h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-									Notificaciones
-								</h3>
-								{unreadCount > 0 && (
-									<span className="px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full">
-										{unreadCount}
-									</span>
-								)}
-							</div>
-							<div className="flex items-center gap-2">
-								{unreadCount > 0 && (
-									<button
-										onClick={markAllAsRead}
-										className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-									>
-										Marcar todas
-									</button>
-								)}
-								<button
-									onClick={() => setIsOpen(false)}
-									className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-								>
-									<NotificationIcons.close className="w-4 h-4" />
-								</button>
-							</div>
+		<div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+			<div className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-gray-700 dark:to-gray-600 px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 dark:border-gray-600">
+				<div className="flex items-center justify-between gap-2">
+					<div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+						{NotificationIcons.panel}
+						<div className="min-w-0">
+							<h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white truncate">Centro de Alertas</h3>
+							<p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 truncate">Notificaciones del sistema</p>
 						</div>
-
-						{/* Lista de notificaciones */}
-						<div className="flex-1 overflow-y-auto">
-							{notifications.length === 0 ? (
-								<div className="p-8 text-center">
-									<NotificationIcons.bell className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-									<p className="text-sm text-gray-600 dark:text-gray-400">
-										No hay notificaciones
-									</p>
-								</div>
-							) : (
-								<div className="divide-y divide-gray-200 dark:divide-gray-700">
-									{notifications.map(notification => (
-										<div
-											key={notification.id}
-											onClick={() => markAsRead(notification.id)}
-											className={`p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
-												!notification.read ? getNotificationStyles(notification.type) : ''
-											} ${notification.read ? 'opacity-75' : ''}`}
-										>
-											<div className="flex items-start gap-3">
-												<div className="shrink-0 mt-0.5">
-													{getNotificationIcon(notification.type)}
-												</div>
-												<div className="flex-1 min-w-0">
-													<div className="flex items-start justify-between gap-2">
-														<h4 className="text-sm font-semibold text-gray-900 dark:text-white">
-															{notification.title}
-														</h4>
-														{!notification.read && (
-															<div className="w-2 h-2 bg-blue-500 rounded-full shrink-0 mt-1.5" />
-														)}
-													</div>
-													<p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-														{notification.message}
-													</p>
-													<p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
-														{formatTime(notification.timestamp)}
-													</p>
-												</div>
-											</div>
-										</div>
-									))}
-								</div>
-							)}
-						</div>
-
-						{/* Footer */}
-						{notifications.length > 0 && (
-							<div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
-								<button
-									onClick={clearAll}
-									className="w-full text-sm text-red-600 dark:text-red-400 hover:underline"
-								>
-									Limpiar todas
-								</button>
+					</div>
+					<div className="flex items-center gap-2 flex-shrink-0">
+						<button
+							onClick={handleRefreshAlerts}
+							className="hidden sm:inline-flex items-center text-xs font-semibold text-blue-700 dark:text-blue-300 hover:underline"
+						>
+							Actualizar
+						</button>
+						{totalUnread > 0 && (
+							<div className="flex items-center space-x-1">
+								<span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+									{totalUnread > 99 ? '99+' : totalUnread}
+								</span>
+								<span className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 hidden sm:inline">sin leer</span>
 							</div>
 						)}
 					</div>
-				</>
+				</div>
+			</div>
+
+			<div className="divide-y divide-gray-100 dark:divide-gray-700 max-h-96 overflow-y-auto">
+				{isLoadingAlerts && combinedAlerts.length === 0 ? (
+					<div className="p-4 space-y-3">
+						<div className="h-14 rounded-lg bg-gray-100 dark:bg-gray-700 animate-pulse" />
+						<div className="h-14 rounded-lg bg-gray-100 dark:bg-gray-700 animate-pulse" />
+					</div>
+				) : alertasAMostrar.length > 0 ? (
+					alertasAMostrar.map(alert => (
+						<button
+							key={alert.id}
+							onClick={() => handleMarkAsRead(alert)}
+							className={`w-full text-left border-l-4 p-3 sm:p-4 transition-colors ${getAlertaStyles(alert.severity)} ${
+								alert.read ? 'opacity-70' : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+							}`}
+						>
+							<div className="flex items-start space-x-2 sm:space-x-3">
+								<div className="flex-shrink-0">
+									{getAlertaIcon(alert.severity)}
+								</div>
+								<div className="flex-1 min-w-0">
+									<div className="flex items-start justify-between gap-2">
+										<p className={`text-xs sm:text-sm ${alert.read ? 'text-gray-700 dark:text-gray-300' : 'font-semibold text-gray-900 dark:text-white'} break-words`}>
+											{alert.title ? `${alert.title}: ${alert.message}` : alert.message}
+										</p>
+										{!alert.read && <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1"></span>}
+									</div>
+									<div className="flex items-center justify-between mt-1.5 sm:mt-1 gap-2">
+										<p className="text-xs text-gray-500 dark:text-gray-400 truncate">{alert.cruce}</p>
+										<p className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatTimestamp(alert.timestamp)}</p>
+									</div>
+								</div>
+							</div>
+						</button>
+					))
+				) : (
+					<div className="p-8 text-center">
+						{NotificationIcons.bell}
+						<h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">Sin alertas</h3>
+						<p className="mt-2 text-gray-500 dark:text-gray-400">Todos los sistemas funcionan correctamente.</p>
+					</div>
+				)}
+			</div>
+
+			{combinedAlerts.length > VISIBLE_ITEMS && (
+				<div className="bg-gray-50 dark:bg-gray-700 px-4 sm:px-6 py-2 sm:py-3 border-t border-gray-100 dark:border-gray-600">
+					<button
+						onClick={() => setMostrarTodas(prev => !prev)}
+						className="w-full text-center text-xs sm:text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+					>
+						{mostrarTodas ? 'Mostrar menos' : `Ver todas (${combinedAlerts.length})`}
+					</button>
+				</div>
 			)}
 		</div>
 	)
 }
+
+export default NotificationPanel
 
