@@ -22,17 +22,17 @@ export const usuariosAPI = {
 		
 		const data = await http.get(endpoint)
 		
-		// Normalizar respuesta del backend
+				// Normalizar respuesta del backend
 		if (data.results) {
 			return data
-		}
-		// Si es un array directo
+				}
+				// Si es un array directo
 		if (Array.isArray(data)) {
-			return {
+					return {
 				results: data,
 				count: data.length
-			}
-		}
+					}
+				}
 		return data
 	},
 
@@ -52,8 +52,8 @@ export const usuariosAPI = {
 		try {
 			return await http.post('/api/users/', data)
 		} catch (error) {
-			console.error('Error al crear usuario:', error)
-			throw error
+				console.error('Error al crear usuario:', error)
+				throw error
 		}
 	},
 
@@ -67,8 +67,8 @@ export const usuariosAPI = {
 		try {
 			return await http.put(`/api/users/${id}/`, data)
 		} catch (error) {
-			console.error('Error al actualizar usuario:', error)
-			throw error
+				console.error('Error al actualizar usuario:', error)
+				throw error
 		}
 	},
 
@@ -82,8 +82,8 @@ export const usuariosAPI = {
 		try {
 			return await http.patch(`/api/users/${id}/`, data)
 		} catch (error) {
-			console.error('Error al actualizar usuario:', error)
-			throw error
+				console.error('Error al actualizar usuario:', error)
+				throw error
 		}
 	},
 
@@ -96,8 +96,8 @@ export const usuariosAPI = {
 		try {
 			await http.delete(`/api/users/${id}/`)
 		} catch (error) {
-			console.error('Error al eliminar usuario:', error)
-			throw error
+				console.error('Error al eliminar usuario:', error)
+				throw error
 		}
 	},
 

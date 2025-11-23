@@ -14,6 +14,18 @@ const STORAGE_KEYS = {
 	USER: 'auth_user',
 }
 
+// ✅ CORRECCIÓN: Callback global para limpiar usuario cuando hay 401
+// Será registrado por AuthContext para sincronizar el estado
+let onUnauthorizedCallback = null
+
+/**
+ * Registrar callback para cuando hay 401 (no autorizado)
+ * @param {Function} callback - Función a llamar cuando hay 401
+ */
+export const setOnUnauthorized = (callback) => {
+	onUnauthorizedCallback = callback
+}
+
 // Log de configuración en modo debug
 if (API_CONFIG.DEBUG) {
 	console.log('🔧 API Configuration:', {
@@ -225,6 +237,31 @@ export const httpClient = async (endpoint, options = {}) => {
 	
 	try {
 		const response = await fetchWithTimeout(url, options)
+		
+		// ✅ CORRECCIÓN: Soporte para responseType: 'blob' (exportaciones CSV)
+		if (options.responseType === 'blob') {
+			if (!response.ok) {
+				// Intentar parsear error como JSON si es posible
+				const errorText = await response.text()
+				let errorData = null
+				try {
+					errorData = JSON.parse(errorText)
+				} catch {
+					// Si no es JSON, usar el texto como mensaje
+					throw new APIError(errorText || `Error HTTP ${response.status}`, response.status)
+				}
+				const errorMessage = errorData?.error || errorData?.detail || errorData?.message || `Error HTTP ${response.status}`
+				throw new APIError(errorMessage, response.status, errorData)
+			}
+			
+			if (API_CONFIG.DEBUG) {
+				console.log(`✅ ${response.status} ${options.method || 'GET'} ${url} (blob)`)
+			}
+			
+			return await response.blob()
+		}
+		
+		// Parsear como JSON para respuestas normales
 		const data = await parseJSON(response)
 
 		if (API_CONFIG.DEBUG) {
@@ -291,6 +328,18 @@ export const httpClient = async (endpoint, options = {}) => {
 		// Manejo especial de errores 401 (desloguear)
 		if (error.status === 401) {
 			clearTokens()
+			
+			// ✅ CORRECCIÓN: Llamar callback para resetear user en AuthContext
+			if (onUnauthorizedCallback) {
+				try {
+					onUnauthorizedCallback()
+				} catch (callbackError) {
+					if (API_CONFIG.DEBUG) {
+						console.error('Error en callback de 401:', callbackError)
+					}
+				}
+			}
+			
 			if (API_CONFIG.DEBUG) {
 				console.warn('⚠️ Token expirado o inválido. Sesión cerrada.')
 			}

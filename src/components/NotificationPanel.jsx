@@ -5,15 +5,16 @@ import { getNotificationSettings } from '../services/notifications'
 import { getSocket } from '../services/socket'
 import { useSocketSubscription } from '../hooks/useSocketSubscription'
 
+// ✅ CORRECCIÓN: Inicializar como deshabilitado hasta cargar settings del usuario
 const DEFAULT_SETTINGS = {
-	enable_notifications: true,
-	notify_critical_alerts: true,
-	notify_warning_alerts: true,
-	notify_info_alerts: true,
-	notify_barrier_events: true,
-	notify_battery_low: true,
-	notify_communication_lost: true,
-	notify_gabinete_open: true,
+	enable_notifications: false, // Deshabilitado por defecto hasta cargar preferencias
+	notify_critical_alerts: false,
+	notify_warning_alerts: false,
+	notify_info_alerts: false,
+	notify_barrier_events: false,
+	notify_battery_low: false,
+	notify_communication_lost: false,
+	notify_gabinete_open: false,
 }
 
 const MAX_ITEMS = 30
@@ -133,7 +134,9 @@ const formatTimestamp = (value) => {
 export function NotificationPanel() {
 	const [alerts, setAlerts] = useState([])
 	const [realtimeNotifications, setRealtimeNotifications] = useState([])
+	// ✅ CORRECCIÓN: Inicializar como deshabilitado y agregar flag de carga
 	const [settings, setSettings] = useState(DEFAULT_SETTINGS)
+	const [settingsLoaded, setSettingsLoaded] = useState(false)
 	const [isLoadingAlerts, setIsLoadingAlerts] = useState(false)
 	const [mostrarTodas, setMostrarTodas] = useState(false)
 
@@ -157,10 +160,14 @@ export function NotificationPanel() {
 	const loadSettings = useCallback(async () => {
 		try {
 			const response = await getNotificationSettings()
+			// ✅ CORRECCIÓN: Cargar settings y marcar como cargadas
 			setSettings({ ...DEFAULT_SETTINGS, ...response })
+			setSettingsLoaded(true)
 		} catch (error) {
+			// Si falla, mantener deshabilitado pero marcar como cargado
 			toast.error(error.message || 'No se pudo obtener la configuración de notificaciones')
 			setSettings(DEFAULT_SETTINGS)
+			setSettingsLoaded(true)
 		}
 	}, [])
 
@@ -203,10 +210,12 @@ export function NotificationPanel() {
 		}
 	}, [shouldProcessNotification, loadAlerts])
 
+	// ✅ CORRECCIÓN: Solo suscribirse después de cargar settings
 	// Manejar unión a room de notificaciones cuando el socket se conecta
 	useEffect(() => {
 		const socket = getSocket()
-		if (!socket || !settings.enable_notifications) {
+		// No suscribirse hasta que las settings estén cargadas
+		if (!socket || !settingsLoaded || !settings.enable_notifications) {
 			return
 		}
 
@@ -228,15 +237,16 @@ export function NotificationPanel() {
 				socket.emit('leave_room', { room: 'notifications' })
 			}
 		}
-	}, [settings.enable_notifications])
+	}, [settings.enable_notifications, settingsLoaded])
 
+	// ✅ CORRECCIÓN: Solo suscribirse después de cargar settings
 	// Usar hook de suscripción para notificaciones
 	useSocketSubscription({
 		events: 'notification',
 		handlers: handleSocketNotification,
-		rooms: settings.enable_notifications ? ['notifications'] : [],
-		enabled: settings.enable_notifications
-	}, [handleSocketNotification, settings.enable_notifications])
+		rooms: (settingsLoaded && settings.enable_notifications) ? ['notifications'] : [],
+		enabled: settingsLoaded && settings.enable_notifications
+	}, [handleSocketNotification, settings.enable_notifications, settingsLoaded])
 
 	const handleRefreshAlerts = () => {
 		loadAlerts()
@@ -306,22 +316,22 @@ export function NotificationPanel() {
 									<div className="flex items-center space-x-1 flex-shrink-0">
 										<span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
 											{totalUnread > 99 ? '99+' : totalUnread}
-										</span>
+					</span>
 										<span className="text-xs text-gray-800 dark:text-gray-300 hidden sm:inline font-medium">sin leer</span>
 									</div>
 								)}
 							</div>
 						</div>
 					</div>
-				</div>
-			</div>
+							</div>
+						</div>
 
 			<div className="divide-y divide-gray-100 dark:divide-gray-700 max-h-96 overflow-y-auto">
 				{isLoadingAlerts && combinedAlerts.length === 0 ? (
 					<div className="p-4 space-y-3">
 						<div className="h-14 rounded-lg bg-gray-100 dark:bg-gray-700 animate-pulse" />
 						<div className="h-14 rounded-lg bg-gray-100 dark:bg-gray-700 animate-pulse" />
-					</div>
+								</div>
 				) : alertasAMostrar.length > 0 ? (
 					alertasAMostrar.map(alert => (
 						<button
@@ -330,24 +340,24 @@ export function NotificationPanel() {
 							className={`w-full text-left border-l-4 p-3 sm:p-4 transition-colors ${getAlertaStyles(alert.severity)} ${
 								alert.read ? 'opacity-70' : 'hover:bg-gray-50 dark:hover:bg-gray-700'
 							}`}
-						>
+										>
 							<div className="flex items-start space-x-2 sm:space-x-3">
 								<div className="flex-shrink-0">
 									{getAlertaIcon(alert.severity)}
-								</div>
-								<div className="flex-1 min-w-0">
-									<div className="flex items-start justify-between gap-2">
+												</div>
+												<div className="flex-1 min-w-0">
+													<div className="flex items-start justify-between gap-2">
 										<p className={`text-xs sm:text-sm ${alert.read ? 'text-gray-700 dark:text-gray-300' : 'font-semibold text-gray-900 dark:text-white'} break-words`}>
 											{alert.title ? `${alert.title}: ${alert.message}` : alert.message}
 										</p>
 										{!alert.read && <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1"></span>}
-									</div>
+													</div>
 									<div className="flex items-center justify-between mt-1.5 sm:mt-1 gap-2">
 										<p className="text-xs text-gray-500 dark:text-gray-400 truncate">{alert.cruce}</p>
 										<p className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatTimestamp(alert.timestamp)}</p>
-									</div>
-								</div>
-							</div>
+												</div>
+											</div>
+										</div>
 						</button>
 					))
 				) : (
@@ -355,19 +365,19 @@ export function NotificationPanel() {
 						{NotificationIcons.bell}
 						<h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">Sin alertas</h3>
 						<p className="mt-2 text-gray-500 dark:text-gray-400">Todos los sistemas funcionan correctamente.</p>
-					</div>
-				)}
-			</div>
+								</div>
+							)}
+						</div>
 
 			{combinedAlerts.length > VISIBLE_ITEMS && (
 				<div className="bg-gray-50 dark:bg-gray-700 px-4 sm:px-6 py-2 sm:py-3 border-t border-gray-100 dark:border-gray-600">
-					<button
+								<button
 						onClick={() => setMostrarTodas(prev => !prev)}
 						className="w-full text-center text-xs sm:text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
-					>
+								>
 						{mostrarTodas ? 'Mostrar menos' : `Ver todas (${combinedAlerts.length})`}
-					</button>
-				</div>
+								</button>
+							</div>
 			)}
 		</div>
 	)

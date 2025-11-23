@@ -1,5 +1,5 @@
 import { useContext } from 'react'
-import { DataContext } from '../contexts/DataContext.jsx'
+import { DataContext } from '../contexts/DataContext'
 
 /**
  * Hook personalizado para acceder al contexto de datos

@@ -32,6 +32,8 @@ export const useSocketSubscription = (options = {}, deps = []) => {
 
 	const handlersRef = useRef(handlers)
 	const cleanupFunctionsRef = useRef([])
+	// ✅ CORRECCIÓN: Guardar referencias de handlers registrados para poder removerlos correctamente
+	const registeredHandlersRef = useRef(new Map())
 
 	// Actualizar referencia de handlers
 	useEffect(() => {
@@ -73,6 +75,12 @@ export const useSocketSubscription = (options = {}, deps = []) => {
 			const handler = handlersMap[event]
 			if (!handler) return
 
+			// ✅ CORRECCIÓN: Remover handler previo si existe
+			const prevHandler = registeredHandlersRef.current.get(event)
+			if (prevHandler) {
+				socketEvents.off(event, prevHandler)
+			}
+
 			// Mapeo de eventos a métodos de socketEvents
 			const eventMethodMap = {
 				'notification': 'onNotification',
@@ -88,15 +96,20 @@ export const useSocketSubscription = (options = {}, deps = []) => {
 			if (methodName && socketEvents[methodName]) {
 				// Usar método específico de socketEvents
 				socketEvents[methodName](handler)
+				// Guardar referencia del handler original para cleanup
+				registeredHandlersRef.current.set(event, handler)
+				// ✅ CORRECCIÓN: Usar off() con la misma referencia en lugar de removeAllListeners
 				cleanupFunctions.push(() => {
-					// Usar removeAllListeners para asegurar limpieza completa
-					socketEvents.removeAllListeners(event)
+					socketEvents.off(event, handler)
+					registeredHandlersRef.current.delete(event)
 				})
 			} else {
 				// Fallback: usar socket.on directamente
 				socket.on(event, handler)
+				registeredHandlersRef.current.set(event, handler)
 				cleanupFunctions.push(() => {
 					socket.off(event, handler)
+					registeredHandlersRef.current.delete(event)
 				})
 			}
 		})
@@ -145,6 +158,7 @@ export const useSocketSubscription = (options = {}, deps = []) => {
 				}
 			})
 			cleanupFunctionsRef.current = []
+			registeredHandlersRef.current.clear()
 		}
 	}, [enabled, JSON.stringify(events), JSON.stringify(cruceIds), JSON.stringify(rooms), ...deps])
 }

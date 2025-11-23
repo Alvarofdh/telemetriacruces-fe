@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react'
 import { login as apiLogin, logout as apiLogout, getStoredUser } from '../services/auth'
-import { isAuthenticated as checkAuth, clearTokens, STORAGE_KEYS } from '../services/httpClient'
+import { isAuthenticated as checkAuth, clearTokens, STORAGE_KEYS, setOnUnauthorized } from '../services/httpClient'
 import { connectSocket, disconnectSocket } from '../services/socket'
 import toast from 'react-hot-toast'
 
@@ -36,6 +36,26 @@ export function AuthProvider({ children }) {
 			console.log('👤 [AuthContext] Usuario actualizado:', user.email, '| Rol:', userRole, '| isAdmin:', admin)
 		}
 	}, [user])
+
+	// ✅ CORRECCIÓN: Registrar callback para limpiar user cuando hay 401
+	useEffect(() => {
+		const handleUnauthorized = () => {
+			// Resetear user y estado cuando hay 401
+			setUser(null)
+			setIsAdmin(false)
+			disconnectSocket()
+			if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+				console.log('🔒 [AuthContext] Usuario reseteado por 401')
+			}
+		}
+		
+		setOnUnauthorized(handleUnauthorized)
+		
+		// Cleanup: remover callback al desmontar
+		return () => {
+			setOnUnauthorized(null)
+		}
+	}, [])
 
 	/**
 	 * Iniciar sesión

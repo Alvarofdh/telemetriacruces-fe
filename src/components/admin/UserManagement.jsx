@@ -425,11 +425,11 @@ export function UserManagement() {
                     Editar
                   </button>
                   {usuario.estado === 'ACTIVO' ? (
-                    <button
+                  <button
                       onClick={() => handleDeactivate(usuario)}
                       className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 text-sm font-medium text-orange-600 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
-                    >
-                      <UserIcons.trash className="w-4 h-4" />
+                  >
+                    <UserIcons.trash className="w-4 h-4" />
                       Desactivar
                     </button>
                   ) : (
@@ -439,7 +439,7 @@ export function UserManagement() {
                     >
                       <UserIcons.user className="w-4 h-4" />
                       Activar
-                    </button>
+                  </button>
                   )}
                 </div>
               </div>

@@ -14,10 +14,15 @@
     "deploy:caprover": "caprover deploy",
     "check": "npm run lint && npm run build",
     "pre-deploy": "bash scripts/pre-deploy-check.sh",
-    "deploy": "npm run pre-deploy && npm run deploy:caprover"
+    "deploy": "npm run pre-deploy && npm run deploy:caprover",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
+    "test:run": "vitest run"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.11",
+    "@tanstack/react-query": "5.90.10",
     "chart.js": "^4.5.0",
     "jspdf": "^3.0.3",
     "jspdf-autotable": "^5.0.2",
@@ -35,13 +40,23 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.29.0",
+    "@tanstack/react-query-devtools": "5.91.0",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "16.3.0",
+    "@testing-library/user-event": "14.6.1",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.5.2",
+    "@vitest/ui": "4.0.13",
     "eslint": "^9.29.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.2.0",
-    "vite": "^7.0.0"
+    "jsdom": "27.2.0",
+    "vite": "^7.0.0",
+    "vitest": "4.0.13"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "4.53.3"
   }
 }

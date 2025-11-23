@@ -177,7 +177,8 @@ const CruceMonitor = ({ cruceId }) => {
 		const handleCruceUpdate = (data) => {
 			console.log('🔄 Cruce actualizado:', data);
 			const cruceInfo = data.data || data;
-			if (cruceInfo && cruceInfo.id === cruceId) {
+			// ✅ CORRECCIÓN: Verificar tanto id como id_cruce para matching correcto
+			if (cruceInfo && (cruceInfo.id === cruceId || cruceInfo.id_cruce === cruceId)) {
 				setCruceData(cruceInfo);
 			}
 		};
@@ -186,7 +187,9 @@ const CruceMonitor = ({ cruceId }) => {
 		const handleTelemetria = (data) => {
 			console.log('📊 Nueva telemetría:', data);
 			const telemetriaInfo = data.data || data;
-			if (telemetriaInfo && telemetriaInfo.cruce === cruceId) {
+			// ✅ CORRECCIÓN: Verificar tanto cruce como id_cruce
+			const telemetriaCruceId = telemetriaInfo.cruce || telemetriaInfo.id_cruce;
+			if (telemetriaInfo && telemetriaCruceId === cruceId) {
 				setTelemetrias(prev => [telemetriaInfo, ...prev].slice(0, 10)); // Mantener últimas 10
 			}
 		};
@@ -195,7 +198,9 @@ const CruceMonitor = ({ cruceId }) => {
 		const handleAlerta = (data) => {
 			console.log('🚨 Nueva alerta:', data);
 			const alertaInfo = data.data || data;
-			if (alertaInfo && alertaInfo.cruce === cruceId) {
+			// ✅ CORRECCIÓN: Verificar tanto cruce como id_cruce
+			const alertaCruceId = alertaInfo.cruce || alertaInfo.id_cruce;
+			if (alertaInfo && alertaCruceId === cruceId) {
 				setAlertas(prev => [alertaInfo, ...prev].slice(0, 10));
 			}
 		};
@@ -204,7 +209,9 @@ const CruceMonitor = ({ cruceId }) => {
 		const handleAlertaResuelta = (data) => {
 			console.log('✅ Alerta resuelta:', data);
 			const alertaInfo = data.data || data;
-			if (alertaInfo && alertaInfo.cruce === cruceId) {
+			// ✅ CORRECCIÓN: Verificar tanto cruce como id_cruce
+			const alertaCruceId = alertaInfo.cruce || alertaInfo.id_cruce;
+			if (alertaInfo && alertaCruceId === cruceId) {
 				// Actualizar el estado de la alerta en la lista
 				setAlertas(prev => prev.map(alerta => 
 					alerta.id === alertaInfo.id 
@@ -218,7 +225,9 @@ const CruceMonitor = ({ cruceId }) => {
 		const handleBarrierEvent = (data) => {
 			console.log('🚧 Evento de barrera:', data);
 			const barrierInfo = data.data || data;
-			if (barrierInfo && barrierInfo.cruce === cruceId) {
+			// ✅ CORRECCIÓN: Verificar tanto cruce como id_cruce
+			const barrierCruceId = barrierInfo.cruce || barrierInfo.id_cruce;
+			if (barrierInfo && barrierCruceId === cruceId) {
 				setBarrierEvents(prev => [barrierInfo, ...prev].slice(0, 10));
 			}
 		};
@@ -259,6 +268,12 @@ const CruceMonitor = ({ cruceId }) => {
 			socket.off('notification', handleNotification);
 			socket.off('subscribed', handleSubscribed);
 			socket.off('joined_room', handleJoinedRoom);
+			
+			// ✅ CORRECCIÓN: Desuscribirse de eventos generales suscritos en 153-159
+			const generalEvents = ['telemetria', 'barrier_events', 'alertas'];
+			socket.emit('unsubscribe', { 
+				events: generalEvents 
+			});
 			
 			// ✅ Desuscribirse de la sala específica del cruce
 			const cruceRoom = `cruce_${cruceId}`;
@@ -312,20 +327,12 @@ const CruceMonitor = ({ cruceId }) => {
 		);
 	}
 
+	// ✅ CORRECCIÓN: Eliminado bloque duplicado
 	if (!connected) {
 		return (
 			<div className="loading-container">
 				<div className="spinner"></div>
 				<p>Conectando al servidor...</p>
-			</div>
-		);
-	}
-
-	if (!connected) {
-		return (
-			<div className="loading-container">
-				<div className="spinner"></div>
-				<p>Conectando a Socket.IO...</p>
 			</div>
 		);
 	}

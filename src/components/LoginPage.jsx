@@ -52,8 +52,8 @@ export function LoginPage() {
 		try {
 			// Usar email sanitizado
 			await login(sanitizedEmail, formData.password)
-			// Redirigir al dashboard después de login exitoso
-			navigate('/')
+				// Redirigir al dashboard después de login exitoso
+				navigate('/')
 		} catch (err) {
 			// Mensajes de error más específicos
 			let errorMessage = 'Credenciales inválidas. Por favor, verifica tu email y contraseña.'

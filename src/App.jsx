@@ -1,10 +1,18 @@
 // src/App.jsx
 import React, { lazy, Suspense } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { AuthProvider } from './contexts/AuthContext'
+import { ConfigProvider } from './contexts/ConfigContext'
+import { CrucesProvider } from './contexts/CrucesContext'
+import { UsuariosProvider } from './contexts/UsuariosContext'
+import { LogsContextProvider } from './contexts/LogsContext'
+import { StatsProvider } from './contexts/StatsContext'
+import { SocketProvider } from './contexts/SocketContext'
 import { DataProvider } from './contexts/DataContext.jsx'
+import { queryClient } from './config/queryClient'
 import { useData } from './hooks/useData'
 import { useAuth } from './hooks/useAuth'
 import { Loading } from './components/Loading'
@@ -94,12 +102,12 @@ function Dashboard() {
 							{/* Botones - Stack en móviles */}
 							<div className="flex items-center gap-2 ml-auto sm:ml-0">
 								{(isAdmin || user?.profile?.role === 'MAINTENANCE' || user?.profile?.role === 'OBSERVER' || user?.role === 'MAINTENANCE' || user?.role === 'OBSERVER') && (
-									<a
-										href="/control"
+									<Link
+										to="/control"
 										className="px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors text-xs sm:text-sm whitespace-nowrap"
 									>
 										Panel de Control
-									</a>
+									</Link>
 								)}
 								
 								<button
@@ -293,37 +301,51 @@ function AppContent() {
 export default function App() {
 	return (
 		<ErrorBoundary>
-			<ThemeProvider>
-				<AuthProvider>
-					<DataProvider>
-						<Toaster
-							position="top-right"
-							toastOptions={{
-								duration: 4000,
-								style: {
-									background: '#363636',
-									color: '#fff',
-								},
-								success: {
-									duration: 3000,
-									iconTheme: {
-										primary: '#22c55e',
-										secondary: '#fff',
-									},
-								},
-								error: {
-									duration: 4000,
-									iconTheme: {
-										primary: '#ef4444',
-										secondary: '#fff',
-									},
-								},
-							}}
-						/>
-						<AppContent />
-					</DataProvider>
-				</AuthProvider>
-			</ThemeProvider>
+			<QueryClientProvider client={queryClient}>
+				<ThemeProvider>
+					<AuthProvider>
+						<ConfigProvider>
+							<CrucesProvider>
+								<UsuariosProvider>
+									<LogsContextProvider>
+										<StatsProvider>
+											<SocketProvider>
+												<DataProvider>
+													<Toaster
+														position="top-right"
+														toastOptions={{
+															duration: 4000,
+															style: {
+																background: '#363636',
+																color: '#fff',
+															},
+															success: {
+																duration: 3000,
+																iconTheme: {
+																	primary: '#22c55e',
+																	secondary: '#fff',
+																},
+															},
+															error: {
+																duration: 4000,
+																iconTheme: {
+																	primary: '#ef4444',
+																	secondary: '#fff',
+																},
+															},
+														}}
+													/>
+													<AppContent />
+												</DataProvider>
+											</SocketProvider>
+										</StatsProvider>
+									</LogsContextProvider>
+								</UsuariosProvider>
+							</CrucesProvider>
+						</ConfigProvider>
+					</AuthProvider>
+				</ThemeProvider>
+			</QueryClientProvider>
 		</ErrorBoundary>
 	)
 }

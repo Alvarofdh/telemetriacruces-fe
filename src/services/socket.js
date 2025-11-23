@@ -27,6 +27,9 @@ const debugError = (...args) => {
 
 let socket = null;
 
+// ✅ CORRECCIÓN: Guardar referencias de handlers para poder removerlos correctamente
+const handlerRefs = new Map();
+
 /**
  * Conectar a Socket.IO con autenticación JWT
  * Según manual de integración: usar polling primero para mejor compatibilidad
@@ -122,6 +125,7 @@ export const disconnectSocket = () => {
 		debugLog('🔌 [Socket.IO] Desconectando socket...');
 		// Remover todos los listeners antes de desconectar para evitar memory leaks
 		socket.removeAllListeners();
+		handlerRefs.clear(); // ✅ CORRECCIÓN: Limpiar referencias al desconectar
 		socket.disconnect();
 		socket = null;
 	}
@@ -132,99 +136,153 @@ export const getSocket = () => socket;
 // Eventos de Socket.IO
 export const socketEvents = {
 	// Escuchar confirmación de conexión autenticada
-	// IMPORTANTE: Este handler se puede registrar múltiples veces, pero socket.on() maneja esto
-	// Si necesitas evitar duplicados, usa socket.off() antes o verifica si ya está registrado
+	// ✅ CORRECCIÓN: Guardar referencia del handler wrapper para poder removerlo correctamente
 	onConnected: (callback) => {
 		if (socket) {
-			// Remover listener previo si existe para evitar duplicados
-			socket.off('connected', callback);
-			socket.on('connected', (data) => {
+			const key = 'connected';
+			// Remover listener previo usando la referencia guardada
+			const prevHandler = handlerRefs.get(key);
+			if (prevHandler) {
+				socket.off(key, prevHandler);
+			}
+			// Crear nuevo handler wrapper
+			const handler = (data) => {
 				debugLog('✅ [Socket.IO] Evento connected recibido:', data);
 				callback(data);
-			});
+			};
+			// Guardar referencia y registrar
+			handlerRefs.set(key, handler);
+			socket.on(key, handler);
 		}
 	},
 	
 	// Escuchar confirmación de suscripción
+	// ✅ CORRECCIÓN: Guardar referencia del handler wrapper
 	onSubscribed: (callback) => {
 		if (socket) {
-			// Remover listener previo para evitar duplicados
-			socket.off('subscribed', callback);
-			socket.on('subscribed', (data) => {
+			const key = 'subscribed';
+			const prevHandler = handlerRefs.get(key);
+			if (prevHandler) {
+				socket.off(key, prevHandler);
+			}
+			const handler = (data) => {
 				debugLog('✅ [Socket.IO] Evento subscribed recibido:', data);
 				callback(data);
-			});
+			};
+			handlerRefs.set(key, handler);
+			socket.on(key, handler);
 		}
 	},
 	
 	// Escuchar confirmación de unión a sala
+	// ✅ CORRECCIÓN: Guardar referencia del handler wrapper
 	onJoinedRoom: (callback) => {
 		if (socket) {
-			// Remover listener previo para evitar duplicados
-			socket.off('joined_room', callback);
-			socket.on('joined_room', (data) => {
+			const key = 'joined_room';
+			const prevHandler = handlerRefs.get(key);
+			if (prevHandler) {
+				socket.off(key, prevHandler);
+			}
+			const handler = (data) => {
 				debugLog('✅ [Socket.IO] Evento joined_room recibido:', data);
 				callback(data);
-			});
+			};
+			handlerRefs.set(key, handler);
+			socket.on(key, handler);
 		}
 	},
 	
 	// Escuchar nuevas alertas (estructura: { type: 'alerta', data: {...}, timestamp: '...' })
+	// ✅ CORRECCIÓN: Guardar referencia del handler wrapper
 	onNewAlerta: (callback) => {
 		if (socket) {
-			socket.on('new_alerta', (eventData) => {
+			const key = 'new_alerta';
+			const prevHandler = handlerRefs.get(key);
+			if (prevHandler) {
+				socket.off(key, prevHandler);
+			}
+			const handler = (eventData) => {
 				debugLog('🚨 [Socket.IO] Evento new_alerta recibido:', eventData);
-				// Extraer data.data según estructura del backend
 				const alertaData = eventData.data || eventData;
 				callback(alertaData);
-			});
+			};
+			handlerRefs.set(key, handler);
+			socket.on(key, handler);
 		}
 	},
 	
 	// Escuchar alertas resueltas (estructura: { type: 'alerta_resuelta', data: {...}, timestamp: '...' })
+	// ✅ CORRECCIÓN: Guardar referencia del handler wrapper
 	onAlertaResolved: (callback) => {
 		if (socket) {
-			socket.on('alerta_resolved', (eventData) => {
-				// Extraer data.data según estructura del backend
+			const key = 'alerta_resolved';
+			const prevHandler = handlerRefs.get(key);
+			if (prevHandler) {
+				socket.off(key, prevHandler);
+			}
+			const handler = (eventData) => {
 				const alertaData = eventData.data || eventData;
 				callback(alertaData);
-			});
+			};
+			handlerRefs.set(key, handler);
+			socket.on(key, handler);
 		}
 	},
 	
 	// Escuchar nueva telemetría (estructura: { type: 'telemetria', data: {...}, timestamp: '...' })
+	// ✅ CORRECCIÓN: Guardar referencia del handler wrapper
 	onNewTelemetria: (callback) => {
 		if (socket) {
-			socket.on('new_telemetria', (eventData) => {
+			const key = 'new_telemetria';
+			const prevHandler = handlerRefs.get(key);
+			if (prevHandler) {
+				socket.off(key, prevHandler);
+			}
+			const handler = (eventData) => {
 				debugLog('📊 [Socket.IO] Evento new_telemetria recibido:', eventData);
-				// Extraer data.data según estructura del backend
 				const telemetriaData = eventData.data || eventData;
 				callback(telemetriaData);
-			});
+			};
+			handlerRefs.set(key, handler);
+			socket.on(key, handler);
 		}
 	},
 	
 	// Escuchar eventos de barrera (estructura: { type: 'barrier_event', data: {...}, timestamp: '...' })
+	// ✅ CORRECCIÓN: Guardar referencia del handler wrapper
 	onBarrierEvent: (callback) => {
 		if (socket) {
-			socket.on('barrier_event', (eventData) => {
+			const key = 'barrier_event';
+			const prevHandler = handlerRefs.get(key);
+			if (prevHandler) {
+				socket.off(key, prevHandler);
+			}
+			const handler = (eventData) => {
 				debugLog('🚧 [Socket.IO] Evento barrier_event recibido:', eventData);
-				// Extraer data.data según estructura del backend
 				const barrierData = eventData.data || eventData;
 				callback(barrierData);
-			});
+			};
+			handlerRefs.set(key, handler);
+			socket.on(key, handler);
 		}
 	},
 	
 	// Escuchar actualizaciones de cruce (estructura: { type: 'cruce_update', data: {...}, timestamp: '...' })
+	// ✅ CORRECCIÓN: Guardar referencia del handler wrapper
 	onCruceUpdate: (callback) => {
 		if (socket) {
-			socket.on('cruce_update', (eventData) => {
+			const key = 'cruce_update';
+			const prevHandler = handlerRefs.get(key);
+			if (prevHandler) {
+				socket.off(key, prevHandler);
+			}
+			const handler = (eventData) => {
 				debugLog('🔄 [Socket.IO] Evento cruce_update recibido:', eventData);
-				// Extraer data.data según estructura del backend
 				const cruceData = eventData.data || eventData;
 				callback(cruceData);
-			});
+			};
+			handlerRefs.set(key, handler);
+			socket.on(key, handler);
 		}
 	},
 	
@@ -285,20 +343,36 @@ export const socketEvents = {
 	*/
 	
 	// Escuchar notificaciones generales
+	// ✅ CORRECCIÓN: Guardar referencia del handler wrapper
 	onNotification: (callback) => {
 		if (socket) {
-			socket.on('notification', (eventData) => {
+			const key = 'notification';
+			const prevHandler = handlerRefs.get(key);
+			if (prevHandler) {
+				socket.off(key, prevHandler);
+			}
+			const handler = (eventData) => {
 				callback(eventData);
-			});
+			};
+			handlerRefs.set(key, handler);
+			socket.on(key, handler);
 		}
 	},
 	
 	// Escuchar actualizaciones del dashboard
+	// ✅ CORRECCIÓN: Guardar referencia del handler wrapper
 	onDashboardUpdate: (callback) => {
 		if (socket) {
-			socket.on('dashboard_update', (eventData) => {
+			const key = 'dashboard_update';
+			const prevHandler = handlerRefs.get(key);
+			if (prevHandler) {
+				socket.off(key, prevHandler);
+			}
+			const handler = (eventData) => {
 				callback(eventData);
-			});
+			};
+			handlerRefs.set(key, handler);
+			socket.on(key, handler);
 		}
 	},
 	
@@ -372,12 +446,15 @@ export const socketEvents = {
 	},
 	
 	// Remover todos los listeners de un evento específico
+	// ✅ CORRECCIÓN: Limpiar referencias guardadas al remover listeners
 	removeAllListeners: (event) => {
 		if (socket) {
 			if (event) {
 				socket.removeAllListeners(event);
+				handlerRefs.delete(event);
 			} else {
 				socket.removeAllListeners();
+				handlerRefs.clear();
 			}
 		}
 	},

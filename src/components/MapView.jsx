@@ -125,13 +125,13 @@ export function MapView() {
                         'bg-gradient-to-r from-rose-500 to-red-600'
                       }`}>
                         <h3 className="font-bold text-sm text-white mb-1 truncate">
-                          {cruce.nombre}
-                        </h3>
+                        {cruce.nombre}
+                      </h3>
                         <span className={`px-2 py-0.5 text-xs font-semibold rounded-full bg-white/20 backdrop-blur-sm text-white border border-white/30 inline-block`}>
-                          {cruce.estado}
-                        </span>
-                      </div>
-                      
+                            {cruce.estado}
+                          </span>
+                        </div>
+                        
                       {/* Contenido */}
                       <div className="p-2.5 space-y-2 bg-white dark:bg-gray-800">
                         {/* Estado General - Compacto */}
@@ -192,7 +192,7 @@ export function MapView() {
                             <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-0.5">Responsable</p>
                             <p className="text-xs text-gray-900 dark:text-white truncate">
                               {cruce.responsable_nombre || cruce.responsable || 'Sin asignar'}
-                            </p>
+                          </p>
                           </div>
                         </div>
                         
