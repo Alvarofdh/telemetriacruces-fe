@@ -18,7 +18,6 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.11",
-    "axios": "1.13.2",
     "chart.js": "^4.5.0",
     "jspdf": "^3.0.3",
     "jspdf-autotable": "^5.0.2",

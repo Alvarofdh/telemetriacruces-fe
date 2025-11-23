@@ -1,23 +1,29 @@
-import { useState, useEffect } from 'react';
-import { telemetriaAPI } from '../../services/api';
-import { socketEvents } from '../../services/socket';
+import { useState, useEffect, useCallback } from 'react';
+import { getTelemetria } from '../../services/telemetria';
+import { useSocketSubscription } from '../../hooks/useSocketSubscription';
 
 const TelemetriaView = ({ cruceId }) => {
 	const [telemetria, setTelemetria] = useState(null);
 	const [historial, setHistorial] = useState([]);
 	const [loading, setLoading] = useState(true);
 
+	// Handler para nuevas telemetrías
+	const handleNewTelemetria = useCallback((data) => {
+		if (data.cruce === cruceId || data.id_cruce === cruceId) {
+			setTelemetria(data);
+			setHistorial((prev) => [data, ...prev.slice(0, 19)]);
+		}
+	}, [cruceId]);
+
+	// Cargar telemetría inicial
 	useEffect(() => {
-		// Cargar telemetría inicial
 		const loadTelemetria = async () => {
 			try {
-				const response = await telemetriaAPI.getByCruce(cruceId, { page_size: 20 });
-				if (response.data.results) {
-					setTelemetria(response.data.results[0]);
-					setHistorial(response.data.results);
-				} else if (response.data.length > 0) {
-					setTelemetria(response.data[0]);
-					setHistorial(response.data);
+				const response = await getTelemetria({ cruce: cruceId, page_size: 20 });
+				const results = response.results || response || [];
+				if (results.length > 0) {
+					setTelemetria(results[0]);
+					setHistorial(results);
 				}
 			} catch (error) {
 				console.error('Error al cargar telemetría:', error);
@@ -27,23 +33,15 @@ const TelemetriaView = ({ cruceId }) => {
 		};
 
 		loadTelemetria();
-
-		// Escuchar nuevas telemetrías en tiempo real
-		const handleNewTelemetria = (data) => {
-			if (data.cruce === cruceId || data.id_cruce === cruceId) {
-				setTelemetria(data);
-				setHistorial((prev) => [data, ...prev.slice(0, 19)]);
-			}
-		};
-
-		socketEvents.onNewTelemetria(handleNewTelemetria);
-		socketEvents.joinCruceRoom(cruceId);
-
-		return () => {
-			socketEvents.off('new_telemetria', handleNewTelemetria);
-			socketEvents.leaveCruceRoom(cruceId);
-		};
 	}, [cruceId]);
+
+	// Suscripción a telemetría en tiempo real
+	useSocketSubscription({
+		events: 'new_telemetria',
+		handlers: handleNewTelemetria,
+		cruceIds: cruceId,
+		enabled: !!cruceId
+	}, [cruceId, handleNewTelemetria]);
 
 	if (loading) {
 		return <div className="text-center py-8 text-gray-600 dark:text-gray-400">Cargando telemetría...</div>;

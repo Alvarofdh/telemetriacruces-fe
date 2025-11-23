@@ -3,7 +3,8 @@ import { useData } from '../../hooks/useData'
 import { useDebounce } from '../../hooks/useDebounce'
 import CruceForm from '../cruces/CruceForm'
 import CruceDeleteModal from '../cruces/CruceDeleteModal'
-import { crucesAPI } from '../../services/api'
+import { deleteCruce } from '../../services/cruces'
+import toast from 'react-hot-toast'
 
 // Iconos SVG profesionales
 const ManagementIcons = {
@@ -51,7 +52,7 @@ const ManagementIcons = {
 }
 
 export function CruceManagement() {
-  const { cruces, agregarCruce, actualizarCruce, eliminarCruce } = useData()
+  const { cruces, agregarCruce, actualizarCruce, eliminarCruce, loadESP32Data } = useData()
   const [showForm, setShowForm] = useState(false)
   const [editingCruce, setEditingCruce] = useState(null)
   const [deletingCruce, setDeletingCruce] = useState(null)
@@ -69,8 +70,8 @@ export function CruceManagement() {
   const handleFormSuccess = async () => {
     setShowForm(false)
     setEditingCruce(null)
-    // Recargar datos desde el contexto o API
-    window.location.reload() // O usar un método de refetch si está disponible
+    // Recargar datos desde el contexto sin recargar la página
+    await loadESP32Data(false)
   }
 
   const handleEdit = (cruce) => {
@@ -85,12 +86,14 @@ export function CruceManagement() {
   const handleDeleteConfirm = async () => {
     if (deletingCruce) {
       try {
-        await crucesAPI.delete(deletingCruce.id || deletingCruce.id_cruce)
+        await deleteCruce(deletingCruce.id || deletingCruce.id_cruce)
         eliminarCruce(deletingCruce.id || deletingCruce.id_cruce)
         setDeletingCruce(null)
+        toast.success('Cruce eliminado exitosamente')
       } catch (error) {
         console.error('Error al eliminar:', error)
-        alert('Error al eliminar cruce')
+        const errorMsg = error.response?.data?.detail || error.response?.data?.message || error.message || 'Error al eliminar cruce'
+        toast.error(errorMsg)
       }
     }
   }
@@ -219,9 +222,9 @@ export function CruceManagement() {
                 className="bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 border border-gray-200 dark:border-gray-700 overflow-hidden"
               >
                 {/* Header con gradiente */}
-                <div className={`bg-gradient-to-r ${estadoStyles.gradient} px-4 sm:px-6 py-3 sm:py-4 rounded-t-xl`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-base sm:text-lg font-semibold text-white leading-tight flex-1 min-w-0 pr-3 uppercase tracking-[0.06em] break-words drop-shadow">
+                <div className={`bg-gradient-to-r ${estadoStyles.gradient} px-4 sm:px-6 py-3 sm:py-4 rounded-t-xl min-h-[4rem] flex items-center`}>
+                  <div className="flex items-center justify-between gap-2 w-full">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white leading-tight flex-1 min-w-0 pr-3 uppercase tracking-normal break-words drop-shadow">
                       {cruce.nombre}
                     </h3>
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -236,28 +239,28 @@ export function CruceManagement() {
                 {/* Contenido */}
                 <div className="p-4 sm:p-6 space-y-3">
                   {/* Ubicación */}
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center shrink-0 mt-0.5 text-white">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/10 border border-gray-200 dark:border-white/20 flex items-center justify-center shrink-0 text-gray-600 dark:text-white">
                       <ManagementIcons.location className="w-4 h-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-white/70 uppercase tracking-[0.25em] mb-0.5">Ubicación</p>
-                      <p className="text-sm text-white break-words leading-tight">{cruce.ubicacion || 'No especificada'}</p>
+                      <p className="text-xs font-semibold text-gray-600 dark:text-white/70 uppercase tracking-[0.25em] mb-0.5">Ubicación</p>
+                      <p className="text-sm text-gray-900 dark:text-white break-words leading-tight">{cruce.ubicacion || 'No especificada'}</p>
                     </div>
                   </div>
 
                   {/* Batería */}
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center shrink-0 mt-0.5 text-white">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/10 border border-gray-200 dark:border-white/20 flex items-center justify-center shrink-0 text-gray-600 dark:text-white">
                       <ManagementIcons.battery className="w-4 h-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-white/70 uppercase tracking-[0.25em] mb-0.5">Batería</p>
+                      <p className="text-xs font-semibold text-gray-600 dark:text-white/70 uppercase tracking-[0.25em] mb-0.5">Batería</p>
                       <div className="flex items-center gap-2">
                         <p className={`text-sm font-semibold ${getBateriaColor(cruce.bateria || 0)} drop-shadow`}>
                           {cruce.bateria || 0}%
                         </p>
-                        <div className="flex-1 h-2 bg-white/20 rounded-full overflow-hidden">
+                        <div className="flex-1 h-2 bg-gray-200 dark:bg-white/20 rounded-full overflow-hidden">
                           <div 
                             className={`h-full transition-all ${
                               (cruce.bateria || 0) >= 70 ? 'bg-green-400' :
@@ -271,13 +274,13 @@ export function CruceManagement() {
                   </div>
 
                   {/* Sensores */}
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center shrink-0 mt-0.5 text-white">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/10 border border-gray-200 dark:border-white/20 flex items-center justify-center shrink-0 text-gray-600 dark:text-white">
                       <ManagementIcons.sensor className="w-4 h-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-white/70 uppercase tracking-[0.25em] mb-0.5">Sensores activos</p>
-                      <p className="text-sm font-semibold text-white">
+                      <p className="text-xs font-semibold text-gray-600 dark:text-white/70 uppercase tracking-[0.25em] mb-0.5">Sensores activos</p>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">
                         {cruce.sensoresActivos || 0} / 4 sensores
                       </p>
                     </div>
@@ -291,32 +294,32 @@ export function CruceManagement() {
                     cruce.responsable_email ||
                     cruce.responsable_horario) && (
                     <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center shrink-0 mt-0.5 text-white">
+                    <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/10 border border-gray-200 dark:border-white/20 flex items-center justify-center shrink-0 text-gray-600 dark:text-white">
                       <ManagementIcons.user className="w-4 h-4" />
                       </div>
                       <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-white/70 uppercase tracking-[0.25em] mb-1">Responsable</p>
-                      <div className="space-y-0.5 text-sm text-white">
+                      <p className="text-xs font-semibold text-gray-600 dark:text-white/70 uppercase tracking-[0.25em] mb-1">Responsable</p>
+                      <div className="space-y-0.5 text-sm text-gray-900 dark:text-white">
                         <p className="font-semibold leading-tight">
                             {cruce.responsable_nombre || cruce.responsable || 'Sin asignar'}
                           </p>
                           {cruce.responsable_empresa && (
-                          <p className="text-xs text-white/70">
+                          <p className="text-xs text-gray-600 dark:text-white/70">
                               {cruce.responsable_empresa}
                             </p>
                           )}
                           {cruce.responsable_telefono && (
-                          <p className="text-xs text-white/80 flex items-center gap-1">
+                          <p className="text-xs text-gray-700 dark:text-white/80 flex items-center gap-1">
                             <span aria-hidden>📞</span>{cruce.responsable_telefono}
                             </p>
                           )}
                           {cruce.responsable_email && (
-                          <p className="text-xs text-blue-200 break-words flex items-center gap-1">
+                          <p className="text-xs text-blue-600 dark:text-blue-200 break-words flex items-center gap-1">
                             <span aria-hidden>✉️</span>{cruce.responsable_email}
                             </p>
                           )}
                           {cruce.responsable_horario && (
-                          <p className="text-xs text-white/80 flex items-center gap-1">
+                          <p className="text-xs text-gray-700 dark:text-white/80 flex items-center gap-1">
                             <span aria-hidden>🕒</span>{cruce.responsable_horario}
                             </p>
                           )}

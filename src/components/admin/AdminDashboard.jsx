@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../../hooks/useData'
+import { useAuth } from '../../hooks/useAuth'
 import { CruceManagement } from './CruceManagement'
 import { UserManagement } from './UserManagement'
 import { SystemLogs } from './SystemLogs'
@@ -16,7 +17,8 @@ import { SimulatorPanel } from './SimulatorPanel'
 
 export function AdminDashboard() {
 	const navigate = useNavigate()
-	const { stats, user, logout, isESP32Connected, lastUpdate } = useData()
+	const { stats, isESP32Connected, lastUpdate } = useData()
+	const { user, logout } = useAuth()
 	const [activeTab, setActiveTab] = useState('overview')
 	const [sidebarOpen, setSidebarOpen] = useState(false)
 

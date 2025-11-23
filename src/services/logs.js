@@ -1,7 +1,6 @@
-import api from './api'
-
 /**
  * Servicio para gestión de logs del sistema
+ * NOTA: El endpoint de logs no está implementado en el backend actual
  */
 export const logsAPI = {
 	/**

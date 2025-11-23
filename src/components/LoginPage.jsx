@@ -1,11 +1,11 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useData } from '../hooks/useData'
+import { useAuth } from '../hooks/useAuth'
 import { sanitizeEmail, isValidEmail } from '../utils/sanitize'
 import { formRateLimiter } from '../utils/rateLimiter'
 
 export function LoginPage() {
-	const { login } = useData()
+	const { login } = useAuth()
 	const navigate = useNavigate()
 	const [formData, setFormData] = useState({
 		email: '',
@@ -51,11 +51,9 @@ export function LoginPage() {
 
 		try {
 			// Usar email sanitizado
-			const success = await login(sanitizedEmail, formData.password)
-			if (success) {
-				// Redirigir al dashboard después de login exitoso
-				navigate('/')
-			}
+			await login(sanitizedEmail, formData.password)
+			// Redirigir al dashboard después de login exitoso
+			navigate('/')
 		} catch (err) {
 			// Mensajes de error más específicos
 			let errorMessage = 'Credenciales inválidas. Por favor, verifica tu email y contraseña.'

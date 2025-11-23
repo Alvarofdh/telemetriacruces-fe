@@ -1,5 +1,38 @@
-import { useState, useEffect } from 'react';
-import { crucesAPI } from '../../services/api';
+import { useState, useEffect, useCallback } from 'react';
+import { getCruce, createCruce, updateCruce } from '../../services/cruces';
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import toast from 'react-hot-toast';
+
+// Componente para manejar clicks en el mapa
+const MapClickHandler = ({ onMapClick }) => {
+	useMapEvents({
+		click: (e) => {
+			onMapClick(e.latlng);
+		},
+	});
+	return null;
+};
+
+// Icono personalizado para el marcador
+const createMarkerIcon = () => {
+	return L.divIcon({
+		html: `
+			<div style="
+				background-color: #3b82f6;
+				border: 3px solid white;
+				border-radius: 50%;
+				width: 24px;
+				height: 24px;
+				box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+			"></div>
+		`,
+		className: 'custom-marker',
+		iconSize: [24, 24],
+		iconAnchor: [12, 12]
+	});
+};
 
 const CruceForm = ({ cruceId, onSuccess, onCancel }) => {
 	const [formData, setFormData] = useState({
@@ -16,18 +49,20 @@ const CruceForm = ({ cruceId, onSuccess, onCancel }) => {
 	});
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState(null);
+	const [markerPosition, setMarkerPosition] = useState(null);
 
 	useEffect(() => {
 		if (cruceId) {
 			// Cargar datos del cruce para editar
-			crucesAPI.getById(cruceId)
-				.then((response) => {
-					const cruce = response.data;
+			getCruce(cruceId)
+				.then((cruce) => {
+					const lat = cruce.coordenadas_lat || '';
+					const lng = cruce.coordenadas_lng || '';
 					setFormData({
 						nombre: cruce.nombre || '',
 						ubicacion: cruce.ubicacion || '',
-						coordenadas_lat: cruce.coordenadas_lat || '',
-						coordenadas_lng: cruce.coordenadas_lng || '',
+						coordenadas_lat: lat,
+						coordenadas_lng: lng,
 						estado: cruce.estado || 'ACTIVO',
 						responsable_nombre: cruce.responsable_nombre || '',
 						responsable_telefono: cruce.responsable_telefono || '',
@@ -35,10 +70,40 @@ const CruceForm = ({ cruceId, onSuccess, onCancel }) => {
 						responsable_empresa: cruce.responsable_empresa || '',
 						responsable_horario: cruce.responsable_horario || '',
 					});
+					// Establecer posición del marcador si hay coordenadas
+					if (lat && lng) {
+						setMarkerPosition([parseFloat(lat), parseFloat(lng)]);
+					}
 				})
-				.catch((err) => setError(err.response?.data?.error || 'Error al cargar cruce'));
+				.catch((err) => {
+					const errorMsg = err.response?.data?.error || err.response?.data?.detail || err.message || 'Error al cargar cruce';
+					setError(errorMsg);
+					toast.error(errorMsg);
+				});
 		}
 	}, [cruceId]);
+
+	// Actualizar marcador cuando cambian las coordenadas manualmente
+	useEffect(() => {
+		if (formData.coordenadas_lat && formData.coordenadas_lng) {
+			const lat = parseFloat(formData.coordenadas_lat);
+			const lng = parseFloat(formData.coordenadas_lng);
+			if (!isNaN(lat) && !isNaN(lng)) {
+				setMarkerPosition([lat, lng]);
+			}
+		}
+	}, [formData.coordenadas_lat, formData.coordenadas_lng]);
+
+	const handleMapClick = useCallback((latlng) => {
+		const lat = latlng.lat.toFixed(6);
+		const lng = latlng.lng.toFixed(6);
+		setFormData((prev) => ({
+			...prev,
+			coordenadas_lat: lat,
+			coordenadas_lng: lng,
+		}));
+		setMarkerPosition([latlng.lat, latlng.lng]);
+	}, []);
 
 	const handleSubmit = async (e) => {
 		e.preventDefault();
@@ -54,14 +119,18 @@ const CruceForm = ({ cruceId, onSuccess, onCancel }) => {
 			};
 
 			if (cruceId) {
-				await crucesAPI.update(cruceId, data);
+				await updateCruce(cruceId, data);
+				toast.success('Cruce actualizado exitosamente');
 			} else {
-				await crucesAPI.create(data);
+				await createCruce(data);
+				toast.success('Cruce creado exitosamente');
 			}
 
 			onSuccess?.();
 		} catch (err) {
-			setError(err.response?.data?.error || err.response?.data?.detail || 'Error al guardar cruce');
+			const errorMsg = err.response?.data?.error || err.response?.data?.detail || err.message || 'Error al guardar cruce';
+			setError(errorMsg);
+			toast.error(errorMsg);
 		} finally {
 			setLoading(false);
 		}
@@ -142,6 +211,36 @@ const CruceForm = ({ cruceId, onSuccess, onCancel }) => {
 						className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
 					/>
 				</div>
+			</div>
+
+			{/* Mapa Interactivo */}
+			<div>
+				<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+					Seleccionar ubicación en el mapa
+				</label>
+				<div className="border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden" style={{ height: '300px' }}>
+					<MapContainer
+						center={markerPosition || [-33.4489, -70.6693]}
+						zoom={markerPosition ? 15 : 6}
+						style={{ height: '100%', width: '100%' }}
+						className="z-0"
+					>
+						<TileLayer
+							url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+							attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+						/>
+						<MapClickHandler onMapClick={handleMapClick} />
+						{markerPosition && (
+							<Marker
+								position={markerPosition}
+								icon={createMarkerIcon()}
+							/>
+						)}
+					</MapContainer>
+				</div>
+				<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+					Haz clic en el mapa para seleccionar la ubicación del cruce. Las coordenadas se actualizarán automáticamente.
+				</p>
 			</div>
 
 			{/* Estado */}

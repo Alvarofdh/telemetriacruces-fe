@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import toast from 'react-hot-toast'
 import { getAlertas } from '../services/alertas'
 import { getNotificationSettings } from '../services/notifications'
-import { getSocket, socketEvents } from '../services/socket'
+import { getSocket } from '../services/socket'
+import { useSocketSubscription } from '../hooks/useSocketSubscription'
 
 const DEFAULT_SETTINGS = {
 	enable_notifications: true,
@@ -185,48 +186,57 @@ export function NotificationPanel() {
 		return true
 	}, [settings])
 
+	// Handler para notificaciones de socket
+	const handleSocketNotification = useCallback((payload) => {
+		if (!shouldProcessNotification(payload)) {
+			return
+		}
+		const normalized = normalizeRealtimeNotification(payload)
+		setRealtimeNotifications(prev => [normalized, ...prev].slice(0, MAX_ITEMS))
+
+		const severity = normalized.severity || 'INFO'
+		const severityEntry = severityConfig[severity] || severityConfig.INFO
+		severityEntry.toast(`${normalized.title}: ${normalized.message}`)
+
+		if (payload.event === 'alert_created' || payload.event === 'alerta_resuelta') {
+			loadAlerts()
+		}
+	}, [shouldProcessNotification, loadAlerts])
+
+	// Manejar unión a room de notificaciones cuando el socket se conecta
 	useEffect(() => {
 		const socket = getSocket()
-		if (!socket) {
+		if (!socket || !settings.enable_notifications) {
 			return
 		}
 
 		const joinNotificationsRoom = () => {
-			if (!settings.enable_notifications) {
-				return
+			if (settings.enable_notifications) {
+				socket.emit('join_room', { room: 'notifications' })
 			}
-			socket.emit('join_room', { room: 'notifications' })
 		}
 
 		if (socket.connected) {
 			joinNotificationsRoom()
 		}
+
 		socket.on('connect', joinNotificationsRoom)
-
-		const handleSocketNotification = (payload) => {
-			if (!shouldProcessNotification(payload)) {
-				return
-			}
-			const normalized = normalizeRealtimeNotification(payload)
-			setRealtimeNotifications(prev => [normalized, ...prev].slice(0, MAX_ITEMS))
-
-			const severity = normalized.severity || 'INFO'
-			const severityEntry = severityConfig[severity] || severityConfig.INFO
-			severityEntry.toast(`${normalized.title}: ${normalized.message}`)
-
-			if (payload.event === 'alert_created' || payload.event === 'alerta_resuelta') {
-				loadAlerts()
-			}
-		}
-
-		socketEvents.onNotification(handleSocketNotification)
 
 		return () => {
 			socket.off('connect', joinNotificationsRoom)
-			socket.emit('leave_room', { room: 'notifications' })
-			socketEvents.off('notification', handleSocketNotification)
+			if (socket.connected) {
+				socket.emit('leave_room', { room: 'notifications' })
+			}
 		}
-	}, [settings.enable_notifications, shouldProcessNotification, loadAlerts])
+	}, [settings.enable_notifications])
+
+	// Usar hook de suscripción para notificaciones
+	useSocketSubscription({
+		events: 'notification',
+		handlers: handleSocketNotification,
+		rooms: settings.enable_notifications ? ['notifications'] : [],
+		enabled: settings.enable_notifications
+	}, [handleSocketNotification, settings.enable_notifications])
 
 	const handleRefreshAlerts = () => {
 		loadAlerts()
@@ -282,30 +292,26 @@ export function NotificationPanel() {
 
 	return (
 		<div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden">
-			<div className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-gray-700 dark:to-gray-600 px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 dark:border-gray-600">
-				<div className="flex items-center justify-between gap-2">
+			<div className="bg-gradient-to-r from-orange-200 to-red-200 dark:from-gray-700 dark:to-gray-600 px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-300 dark:border-gray-600">
+				<div className="flex items-start justify-between gap-2">
 					<div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
-						{NotificationIcons.panel}
-						<div className="min-w-0">
-							<h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white truncate">Centro de Alertas</h3>
-							<p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 truncate">Notificaciones del sistema</p>
-						</div>
-					</div>
-					<div className="flex items-center gap-2 flex-shrink-0">
-						<button
-							onClick={handleRefreshAlerts}
-							className="hidden sm:inline-flex items-center text-xs font-semibold text-blue-700 dark:text-blue-300 hover:underline"
-						>
-							Actualizar
-						</button>
-						{totalUnread > 0 && (
-							<div className="flex items-center space-x-1">
-								<span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-									{totalUnread > 99 ? '99+' : totalUnread}
-								</span>
-								<span className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 hidden sm:inline">sin leer</span>
+						<svg className="w-5 h-5 sm:w-6 sm:h-6 text-orange-800 dark:text-orange-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5-5-5h5V3h0z" />
+						</svg>
+						<div className="min-w-0 flex-1">
+							<h3 className="text-base sm:text-lg font-bold text-gray-950 dark:text-white truncate drop-shadow">Centro de Alertas</h3>
+							<div className="flex items-center justify-between gap-2 mt-0.5">
+								<p className="text-xs sm:text-sm text-gray-800 dark:text-gray-300 truncate font-medium">Notificaciones del sistema</p>
+								{totalUnread > 0 && (
+									<div className="flex items-center space-x-1 flex-shrink-0">
+										<span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+											{totalUnread > 99 ? '99+' : totalUnread}
+										</span>
+										<span className="text-xs text-gray-800 dark:text-gray-300 hidden sm:inline font-medium">sin leer</span>
+									</div>
+								)}
 							</div>
-						)}
+						</div>
 					</div>
 				</div>
 			</div>

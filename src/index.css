@@ -114,11 +114,27 @@
   filter: brightness(0.9) contrast(1.1);
 }
 
+/* Estilos para popup de Leaflet */
+.leaflet-popup-content-wrapper {
+  border-radius: 0.5rem !important;
+  padding: 0 !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+  width: auto !important;
+}
+
 .dark .leaflet-popup-content-wrapper {
-  background-color: #374151 !important;
-  color: #f3f4f6 !important;
+  background-color: transparent !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2) !important;
+}
+
+.leaflet-popup-tip {
+  background: white !important;
 }
 
 .dark .leaflet-popup-tip {
-  background-color: #374151 !important;
+  background: #1f2937 !important;
 } 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { sensoresAPI } from '../../services/api';
+import { getSensores } from '../../services/sensores';
 
 const SensorList = ({ cruceId }) => {
 	const [sensores, setSensores] = useState([]);
@@ -8,8 +8,8 @@ const SensorList = ({ cruceId }) => {
 	useEffect(() => {
 		const loadSensores = async () => {
 			try {
-				const response = await sensoresAPI.getByCruce(cruceId);
-				setSensores(response.data.results || response.data || []);
+				const response = await getSensores({ cruce: cruceId });
+				setSensores(response.results || response || []);
 			} catch (error) {
 				console.error('Error al cargar sensores:', error);
 			} finally {

@@ -3,8 +3,10 @@ import React, { lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { ThemeProvider } from './contexts/ThemeContext'
+import { AuthProvider } from './contexts/AuthContext'
 import { DataProvider } from './contexts/DataContext.jsx'
 import { useData } from './hooks/useData'
+import { useAuth } from './hooks/useAuth'
 import { Loading } from './components/Loading'
 import ErrorBoundary from './components/ErrorBoundary'
 import { useAPIVerification } from './hooks/useAPIVerification'
@@ -17,13 +19,13 @@ const CrossingList = lazy(() => import('./components/CrossingList').then(module 
 const CruceDetail = lazy(() => import('./components/CruceDetail').then(module => ({ default: module.CruceDetail })))
 const ThemeToggle = lazy(() => import('./components/ThemeToggle').then(module => ({ default: module.ThemeToggle })))
 const NotificationPanel = lazy(() => import('./components/NotificationPanel'))
-const AdminDashboard = lazy(() => import('./components/admin/AdminDashboard').then(module => ({ default: module.AdminDashboard })))
+const ControlPanel = lazy(() => import('./components/control/ControlPanel').then(module => ({ default: module.ControlPanel })))
 const LoginPage = lazy(() => import('./components/LoginPage').then(module => ({ default: module.LoginPage })))
 const CruceMonitorPage = lazy(() => import('./components/CruceMonitorPage'))
 
 // Componente para proteger rutas
 function ProtectedRoute({ children }) {
-	const { user } = useData()
+	const { user } = useAuth()
 	
 	if (!user) {
 		return <Navigate to="/login" replace />
@@ -34,7 +36,8 @@ function ProtectedRoute({ children }) {
 
 // Dashboard no se carga lazy porque es la página principal
 function Dashboard() {
-	const { stats, logout, user, isAdmin, isESP32Connected, lastUpdate } = useData()
+	const { stats, isESP32Connected, lastUpdate } = useData()
+	const { logout, user, isAdmin } = useAuth()
 	
 	// Actualizar meta tags para el dashboard
 	useMetaTags({
@@ -90,12 +93,12 @@ function Dashboard() {
 							
 							{/* Botones - Stack en móviles */}
 							<div className="flex items-center gap-2 ml-auto sm:ml-0">
-								{isAdmin && (
+								{(isAdmin || user?.profile?.role === 'MAINTENANCE' || user?.profile?.role === 'OBSERVER' || user?.role === 'MAINTENANCE' || user?.role === 'OBSERVER') && (
 									<a
-										href="/admin"
-										className="px-3 py-1.5 sm:px-4 sm:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 transition-colors text-xs sm:text-sm whitespace-nowrap"
+										href="/control"
+										className="px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors text-xs sm:text-sm whitespace-nowrap"
 									>
-										Admin
+										Panel de Control
 									</a>
 								)}
 								
@@ -213,7 +216,7 @@ function Dashboard() {
 
 // Componente interno para manejar hooks que requieren Router
 function RouterContent() {
-	const { user, isAdmin } = useData()
+	const { user, isAdmin } = useAuth()
 	const envConfig = getEnvConfig()
 	
 	// Activar auto-logout después de inactividad (debe estar dentro del Router)
@@ -255,12 +258,19 @@ function RouterContent() {
 					} 
 				/>
 				<Route 
-					path="/admin" 
+					path="/control" 
 					element={
 						<ProtectedRoute>
-							{user && isAdmin ? <AdminDashboard /> : <Navigate to="/" replace />}
+							<Suspense fallback={<Loading />}>
+								<ControlPanel />
+							</Suspense>
 						</ProtectedRoute>
 					} 
+				/>
+				{/* Redirigir /admin a /control para mantener compatibilidad */}
+				<Route 
+					path="/admin" 
+					element={<Navigate to="/control" replace />} 
 				/>
 				
 				{/* Ruta por defecto - redirige a login */}
@@ -284,33 +294,35 @@ export default function App() {
 	return (
 		<ErrorBoundary>
 			<ThemeProvider>
-				<DataProvider>
-					<Toaster
-						position="top-right"
-						toastOptions={{
-							duration: 4000,
-							style: {
-								background: '#363636',
-								color: '#fff',
-							},
-							success: {
-								duration: 3000,
-								iconTheme: {
-									primary: '#22c55e',
-									secondary: '#fff',
-								},
-							},
-							error: {
+				<AuthProvider>
+					<DataProvider>
+						<Toaster
+							position="top-right"
+							toastOptions={{
 								duration: 4000,
-								iconTheme: {
-									primary: '#ef4444',
-									secondary: '#fff',
+								style: {
+									background: '#363636',
+									color: '#fff',
 								},
-							},
-						}}
-					/>
-					<AppContent />
-				</DataProvider>
+								success: {
+									duration: 3000,
+									iconTheme: {
+										primary: '#22c55e',
+										secondary: '#fff',
+									},
+								},
+								error: {
+									duration: 4000,
+									iconTheme: {
+										primary: '#ef4444',
+										secondary: '#fff',
+									},
+								},
+							}}
+						/>
+						<AppContent />
+					</DataProvider>
+				</AuthProvider>
 			</ThemeProvider>
 		</ErrorBoundary>
 	)

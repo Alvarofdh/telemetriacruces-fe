@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../../hooks/useData'
+import toast from 'react-hot-toast'
 
 export function SystemConfig() {
 	const navigate = useNavigate()
@@ -16,7 +17,7 @@ export function SystemConfig() {
   const handleSave = () => {
     setConfiguracion(config)
     setUnsavedChanges(false)
-    alert('Configuración guardada exitosamente')
+    toast.success('Configuración guardada exitosamente')
   }
 
   const handleReset = () => {
@@ -30,7 +31,7 @@ export function SystemConfig() {
 			<div className="flex justify-between items-center">
 				<div className="flex items-center space-x-4">
 					<button
-						onClick={() => navigate('/admin')}
+						onClick={() => navigate('/control')}
 						className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 dark:bg-gray-500 dark:hover:bg-gray-600 transition-colors"
 					>
 						<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

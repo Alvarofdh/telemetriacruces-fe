@@ -1,13 +1,13 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useData } from './useData'
+import { useAuth } from './useAuth'
 
 /**
  * Hook para auto-logout después de inactividad
  * @param {number} minutes - Minutos de inactividad antes de logout
  */
 export const useAutoLogout = (minutes = 30) => {
-	const { user, logout } = useData()
+	const { user, logout } = useAuth()
 	const navigate = useNavigate()
 	const timeoutRef = useRef(null)
 	const lastActivityRef = useRef(Date.now())

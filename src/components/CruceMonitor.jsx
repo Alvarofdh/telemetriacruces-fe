@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { getSocket } from '../services/socket';
-import { crucesAPI, telemetriaAPI, alertasAPI } from '../services/api';
+import { getCruce } from '../services/cruces';
+import { getTelemetria } from '../services/telemetria';
+import { getAlertas } from '../services/alertas';
 import { getBarrierEvents } from '../services/barrierEvents';
 import '../assets/styles/CruceMonitor.css';
 
@@ -34,16 +36,17 @@ const CruceMonitor = ({ cruceId }) => {
 
 			try {
 				// 1. Cargar información del cruce específico
-				const cruceResponse = await crucesAPI.getById(cruceId);
-				setCruceData(cruceResponse.data || cruceResponse);
+				const cruce = await getCruce(cruceId);
+				setCruceData(cruce);
 
 				// 2. Cargar telemetría reciente solo de este cruce (filtrado en backend)
 				try {
-					const telemetriaResponse = await telemetriaAPI.getByCruce(cruceId, { 
+					const telemetriaResponse = await getTelemetria({ 
+						cruce: cruceId,
 						page: 1, 
 						page_size: 10 
 					});
-					const telemetriaList = telemetriaResponse.data?.results || telemetriaResponse.data || telemetriaResponse.results || [];
+					const telemetriaList = telemetriaResponse.results || telemetriaResponse || [];
 					setTelemetrias(telemetriaList);
 				} catch (err) {
 					console.warn('⚠️ No se pudo cargar telemetría inicial:', err);
@@ -51,12 +54,13 @@ const CruceMonitor = ({ cruceId }) => {
 
 				// 3. Cargar alertas activas solo de este cruce (filtrado en backend)
 				try {
-					const alertasResponse = await alertasAPI.getByCruce(cruceId, { 
+					const alertasResponse = await getAlertas({ 
+						cruce: cruceId,
 						resolved: false, 
 						page: 1, 
 						page_size: 10 
 					});
-					const alertasList = alertasResponse.data?.results || alertasResponse.data || alertasResponse.results || [];
+					const alertasList = alertasResponse.results || alertasResponse || [];
 					setAlertas(alertasList);
 				} catch (err) {
 					console.warn('⚠️ No se pudo cargar alertas iniciales:', err);

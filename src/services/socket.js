@@ -5,6 +5,26 @@ import { getAccessToken } from './httpClient';
 const SOCKETIO_URL = import.meta.env.VITE_SOCKETIO_URL || 
 	(import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/api\/?$/, '');
 
+const DEBUG = import.meta.env.VITE_DEBUG_MODE === 'true';
+
+// Helper para logging condicional (solo en modo debug)
+const debugLog = (...args) => {
+	if (DEBUG) {
+		console.log(...args);
+	}
+};
+
+const debugWarn = (...args) => {
+	if (DEBUG) {
+		console.warn(...args);
+	}
+};
+
+// Los errores siempre se muestran (son críticos)
+const debugError = (...args) => {
+	console.error(...args);
+};
+
 let socket = null;
 
 /**
@@ -38,60 +58,60 @@ export const connectSocket = (token) => {
 	
 	// Evento: Conexión establecida (se dispara en conexión inicial Y reconexión)
 	socket.on('connect', () => {
-		console.log('✅ [Socket.IO] Conectado - Socket ID:', socket.id);
-		console.log('   📊 Estado:', socket.connected ? 'Conectado' : 'Desconectado');
+		debugLog('✅ [Socket.IO] Conectado - Socket ID:', socket.id);
+		debugLog('   📊 Estado:', socket.connected ? 'Conectado' : 'Desconectado');
 	});
 
 	// Evento: Autenticación exitosa (evento personalizado del backend)
 	socket.on('connected', (data) => {
-		console.log('✅ [Socket.IO] Autenticado exitosamente:', data);
+		debugLog('✅ [Socket.IO] Autenticado exitosamente:', data);
 		if (data?.user) {
-			console.log('   👤 Usuario:', data.user.email || data.user.username, `(ID: ${data.user.id})`);
+			debugLog('   👤 Usuario:', data.user.email || data.user.username, `(ID: ${data.user.id})`);
 		}
 	});
 
 	// Evento: Confirmación de suscripción
 	socket.on('subscribed', (data) => {
-		console.log('✅ [Socket.IO] Suscrito a eventos:', data.events || data);
+		debugLog('✅ [Socket.IO] Suscrito a eventos:', data.events || data);
 	});
 
 	// Evento: Confirmación de unión a sala
 	socket.on('joined_room', (data) => {
-		console.log('✅ [Socket.IO] Unido a sala:', data.room || data);
+		debugLog('✅ [Socket.IO] Unido a sala:', data.room || data);
 	});
 
 	// Evento: Desconexión
 	socket.on('disconnect', (reason, details) => {
-		console.log('❌ [Socket.IO] Desconectado:', reason);
+		debugLog('❌ [Socket.IO] Desconectado:', reason);
 		if (socket.active) {
-			console.log('   🔄 Reconexión automática activada');
+			debugLog('   🔄 Reconexión automática activada');
 		} else {
-			console.log('   ⚠️ Reconexión manual requerida');
+			debugWarn('   ⚠️ Reconexión manual requerida');
 		}
 	});
 
 	// Evento: Error de conexión
 	socket.on('connect_error', (error) => {
-		console.error('❌ [Socket.IO] Error de conexión:', error.message);
+		debugError('❌ [Socket.IO] Error de conexión:', error.message);
 		if (socket.active) {
-			console.log('   🔄 Intentando reconectar automáticamente...');
+			debugLog('   🔄 Intentando reconectar automáticamente...');
 		} else {
-			console.error('   ⚠️ La conexión fue denegada por el servidor');
-			console.error('   💡 Debes llamar manualmente a socket.connect() para reconectar');
+			debugError('   ⚠️ La conexión fue denegada por el servidor');
+			debugError('   💡 Debes llamar manualmente a socket.connect() para reconectar');
 		}
 		// Mensajes más descriptivos según manual
 		if (error.message?.includes('token') || error.message?.includes('auth') || error.message?.includes('403')) {
-			console.error('   🔑 Token inválido o expirado. Por favor, inicia sesión nuevamente.');
+			debugError('   🔑 Token inválido o expirado. Por favor, inicia sesión nuevamente.');
 		} else if (error.message?.includes('CORS')) {
-			console.error('   🌐 Error de CORS. Verifica la configuración del servidor.');
+			debugError('   🌐 Error de CORS. Verifica la configuración del servidor.');
 		} else if (error.message?.includes('timeout')) {
-			console.error('   ⏱️ Timeout de conexión. Verifica que el servidor esté corriendo.');
+			debugError('   ⏱️ Timeout de conexión. Verifica que el servidor esté corriendo.');
 		}
 	});
 
 	// Evento: Error general (evento personalizado del backend)
 	socket.on('error', (data) => {
-		console.error('❌ [Socket.IO] Error:', data);
+		debugError('❌ [Socket.IO] Error:', data);
 	});
 
 	return socket;
@@ -99,7 +119,7 @@ export const connectSocket = (token) => {
 
 export const disconnectSocket = () => {
 	if (socket) {
-		console.log('🔌 [Socket.IO] Desconectando socket...');
+		debugLog('🔌 [Socket.IO] Desconectando socket...');
 		// Remover todos los listeners antes de desconectar para evitar memory leaks
 		socket.removeAllListeners();
 		socket.disconnect();
@@ -119,7 +139,7 @@ export const socketEvents = {
 			// Remover listener previo si existe para evitar duplicados
 			socket.off('connected', callback);
 			socket.on('connected', (data) => {
-				console.log('✅ [Socket.IO] Evento connected recibido:', data);
+				debugLog('✅ [Socket.IO] Evento connected recibido:', data);
 				callback(data);
 			});
 		}
@@ -131,7 +151,7 @@ export const socketEvents = {
 			// Remover listener previo para evitar duplicados
 			socket.off('subscribed', callback);
 			socket.on('subscribed', (data) => {
-				console.log('✅ [Socket.IO] Evento subscribed recibido:', data);
+				debugLog('✅ [Socket.IO] Evento subscribed recibido:', data);
 				callback(data);
 			});
 		}
@@ -143,7 +163,7 @@ export const socketEvents = {
 			// Remover listener previo para evitar duplicados
 			socket.off('joined_room', callback);
 			socket.on('joined_room', (data) => {
-				console.log('✅ [Socket.IO] Evento joined_room recibido:', data);
+				debugLog('✅ [Socket.IO] Evento joined_room recibido:', data);
 				callback(data);
 			});
 		}
@@ -153,7 +173,7 @@ export const socketEvents = {
 	onNewAlerta: (callback) => {
 		if (socket) {
 			socket.on('new_alerta', (eventData) => {
-				console.log('🚨 [Socket.IO] Evento new_alerta recibido:', eventData);
+				debugLog('🚨 [Socket.IO] Evento new_alerta recibido:', eventData);
 				// Extraer data.data según estructura del backend
 				const alertaData = eventData.data || eventData;
 				callback(alertaData);
@@ -176,7 +196,7 @@ export const socketEvents = {
 	onNewTelemetria: (callback) => {
 		if (socket) {
 			socket.on('new_telemetria', (eventData) => {
-				console.log('📊 [Socket.IO] Evento new_telemetria recibido:', eventData);
+				debugLog('📊 [Socket.IO] Evento new_telemetria recibido:', eventData);
 				// Extraer data.data según estructura del backend
 				const telemetriaData = eventData.data || eventData;
 				callback(telemetriaData);
@@ -188,7 +208,7 @@ export const socketEvents = {
 	onBarrierEvent: (callback) => {
 		if (socket) {
 			socket.on('barrier_event', (eventData) => {
-				console.log('🚧 [Socket.IO] Evento barrier_event recibido:', eventData);
+				debugLog('🚧 [Socket.IO] Evento barrier_event recibido:', eventData);
 				// Extraer data.data según estructura del backend
 				const barrierData = eventData.data || eventData;
 				callback(barrierData);
@@ -200,7 +220,7 @@ export const socketEvents = {
 	onCruceUpdate: (callback) => {
 		if (socket) {
 			socket.on('cruce_update', (eventData) => {
-				console.log('🔄 [Socket.IO] Evento cruce_update recibido:', eventData);
+				debugLog('🔄 [Socket.IO] Evento cruce_update recibido:', eventData);
 				// Extraer data.data según estructura del backend
 				const cruceData = eventData.data || eventData;
 				callback(cruceData);
@@ -287,20 +307,20 @@ export const socketEvents = {
 	// Para recibir eventos de cruce, debes suscribirte a 'cruce_{id}', no a 'cruce_update'
 	subscribe: (events) => {
 		if (socket && socket.connected) {
-			console.log('📡 [Socket.IO] Suscribiéndose a eventos:', events);
+			debugLog('📡 [Socket.IO] Suscribiéndose a eventos:', events);
 			socket.emit('subscribe', { events });
 		} else {
-			console.warn('⚠️ [Socket.IO] No se puede suscribir - Socket no conectado');
+			debugWarn('⚠️ [Socket.IO] No se puede suscribir - Socket no conectado');
 		}
 	},
 	
 	// Desuscribirse de eventos específicos
 	unsubscribe: (events) => {
 		if (socket && socket.connected) {
-			console.log('📡 [Socket.IO] Desuscribiéndose de eventos:', events);
+			debugLog('📡 [Socket.IO] Desuscribiéndose de eventos:', events);
 			socket.emit('unsubscribe', { events });
 		} else {
-			console.warn('⚠️ [Socket.IO] No se puede desuscribir - Socket no conectado');
+			debugWarn('⚠️ [Socket.IO] No se puede desuscribir - Socket no conectado');
 		}
 	},
 	
@@ -308,10 +328,10 @@ export const socketEvents = {
 	joinCruceRoom: (cruceId) => {
 		if (socket && socket.connected) {
 			const room = `cruce_${cruceId}`;
-			console.log('🚪 [Socket.IO] Uniéndose a sala:', room);
+			debugLog('🚪 [Socket.IO] Uniéndose a sala:', room);
 			socket.emit('join_room', { room });
 		} else {
-			console.warn('⚠️ [Socket.IO] No se puede unir a sala - Socket no conectado');
+			debugWarn('⚠️ [Socket.IO] No se puede unir a sala - Socket no conectado');
 		}
 	},
 	

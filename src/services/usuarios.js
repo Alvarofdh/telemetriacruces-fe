@@ -1,4 +1,4 @@
-import api from './api'
+import { http } from './httpClient'
 
 /**
  * Servicio para gestión de usuarios
@@ -9,22 +9,31 @@ export const usuariosAPI = {
 	 * @param {Object} params - Parámetros de consulta (page, page_size, search, etc.)
 	 * @returns {Promise<Object>} Lista de usuarios
 	 */
-	getAll: (params = {}) => {
-		return api.get('/users/', { params })
-			.then(response => {
-				// Normalizar respuesta del backend
-				if (response.data.results) {
-					return response.data
-				}
-				// Si es un array directo
-				if (Array.isArray(response.data)) {
-					return {
-						results: response.data,
-						count: response.data.length
-					}
-				}
-				return response.data
-			})
+	getAll: async (params = {}) => {
+		const queryParams = new URLSearchParams()
+		Object.keys(params).forEach(key => {
+			if (params[key] !== undefined && params[key] !== null) {
+				queryParams.append(key, params[key])
+			}
+		})
+		
+		const queryString = queryParams.toString()
+		const endpoint = `/api/users/${queryString ? `?${queryString}` : ''}`
+		
+		const data = await http.get(endpoint)
+		
+		// Normalizar respuesta del backend
+		if (data.results) {
+			return data
+		}
+		// Si es un array directo
+		if (Array.isArray(data)) {
+			return {
+				results: data,
+				count: data.length
+			}
+		}
+		return data
 	},
 
 	/**
@@ -32,20 +41,20 @@ export const usuariosAPI = {
 	 * @param {number|string} id - ID del usuario
 	 * @returns {Promise<Object>} Datos del usuario
 	 */
-	getById: (id) => api.get(`/users/${id}/`).then(response => response.data),
+	getById: (id) => http.get(`/api/users/${id}/`),
 
 	/**
 	 * Crear un nuevo usuario
 	 * @param {Object} data - Datos del usuario
 	 * @returns {Promise<Object>} Usuario creado
 	 */
-	create: (data) => {
-		return api.post('/users/', data)
-			.then(response => response.data)
-			.catch(error => {
-				console.error('Error al crear usuario:', error)
-				throw error
-			})
+	create: async (data) => {
+		try {
+			return await http.post('/api/users/', data)
+		} catch (error) {
+			console.error('Error al crear usuario:', error)
+			throw error
+		}
 	},
 
 	/**
@@ -54,13 +63,13 @@ export const usuariosAPI = {
 	 * @param {Object} data - Datos a actualizar
 	 * @returns {Promise<Object>} Usuario actualizado
 	 */
-	update: (id, data) => {
-		return api.put(`/users/${id}/`, data)
-			.then(response => response.data)
-			.catch(error => {
-				console.error('Error al actualizar usuario:', error)
-				throw error
-			})
+	update: async (id, data) => {
+		try {
+			return await http.put(`/api/users/${id}/`, data)
+		} catch (error) {
+			console.error('Error al actualizar usuario:', error)
+			throw error
+		}
 	},
 
 	/**
@@ -69,13 +78,13 @@ export const usuariosAPI = {
 	 * @param {Object} data - Datos a actualizar
 	 * @returns {Promise<Object>} Usuario actualizado
 	 */
-	patch: (id, data) => {
-		return api.patch(`/users/${id}/`, data)
-			.then(response => response.data)
-			.catch(error => {
-				console.error('Error al actualizar usuario:', error)
-				throw error
-			})
+	patch: async (id, data) => {
+		try {
+			return await http.patch(`/api/users/${id}/`, data)
+		} catch (error) {
+			console.error('Error al actualizar usuario:', error)
+			throw error
+		}
 	},
 
 	/**
@@ -83,12 +92,13 @@ export const usuariosAPI = {
 	 * @param {number|string} id - ID del usuario
 	 * @returns {Promise<void>}
 	 */
-	delete: (id) => {
-		return api.delete(`/users/${id}/`)
-			.catch(error => {
-				console.error('Error al eliminar usuario:', error)
-				throw error
-			})
+	delete: async (id) => {
+		try {
+			await http.delete(`/api/users/${id}/`)
+		} catch (error) {
+			console.error('Error al eliminar usuario:', error)
+			throw error
+		}
 	},
 
 	/**
@@ -96,13 +106,13 @@ export const usuariosAPI = {
 	 * @param {number|string} id - ID del usuario
 	 * @returns {Promise<Object>} Usuario actualizado
 	 */
-	activate: (id) => {
-		return api.post(`/users/${id}/activate/`)
-			.then(response => response.data)
-			.catch(error => {
-				console.error('Error al activar usuario:', error)
-				throw error
-			})
+	activate: async (id) => {
+		try {
+			return await http.post(`/api/users/${id}/activate/`)
+		} catch (error) {
+			console.error('Error al activar usuario:', error)
+			throw error
+		}
 	},
 
 	/**
@@ -111,10 +121,7 @@ export const usuariosAPI = {
 	 * @param {string} estado - Nuevo estado (ACTIVO, INACTIVO)
 	 * @returns {Promise<Object>} Usuario actualizado
 	 */
-	changeStatus: (id, estado) => {
-		return api.patch(`/users/${id}/`, { estado })
-			.then(response => response.data)
-	}
+	changeStatus: (id, estado) => http.patch(`/api/users/${id}/`, { estado })
 }
 
 export default usuariosAPI

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import CruceMonitor from './CruceMonitor';
-import { useData } from '../hooks/useData';
+import { useAuth } from '../hooks/useAuth';
 
 /**
  * Página wrapper para CruceMonitor que maneja el parámetro de ruta
@@ -9,7 +9,7 @@ import { useData } from '../hooks/useData';
 const CruceMonitorPage = () => {
 	const { id } = useParams();
 	const navigate = useNavigate();
-	const { user, logout } = useData();
+	const { user, logout } = useAuth();
 	const cruceId = parseInt(id);
 
 	const handleLogout = () => {

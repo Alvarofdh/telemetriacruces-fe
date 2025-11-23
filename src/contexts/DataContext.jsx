@@ -10,15 +10,13 @@ import {
 	getAlertas,
 	getSensores,
 	getBarrierEvents,
-	login as apiLogin,
-	logout as apiLogout,
-	getStoredUser,
-	isAuthenticated,
 	usuariosAPI,
 	logsAPI,
 } from '../services'
 import { connectSocket, disconnectSocket, socketEvents, getSocket } from '../services/socket'
 import { getAccessToken } from '../services/httpClient'
+import { useAuth } from '../hooks/useAuth'
+import { usePermissions } from '../hooks/usePermissions'
 import toast from 'react-hot-toast'
 
 /**
@@ -28,14 +26,10 @@ import toast from 'react-hot-toast'
 export const DataContext = createContext()
 
 export function DataProvider({ children }) {
-	// Estado de autenticación con persistencia en localStorage
-	const [user, setUser] = useState(() => {
-		return getStoredUser()
-	})
-	const [isAdmin, setIsAdmin] = useState(() => {
-		if (!user) return false
-		return user.profile?.role === 'ADMIN' || user.profile?.role === 'MAINTENANCE'
-	})
+	// Obtener estado de autenticación del AuthContext
+	const { user, isAdmin, isAuthenticated: checkAuth } = useAuth()
+	// Obtener permisos del usuario
+	const { hasPermission } = usePermissions()
 
 	// Estados para datos del ESP32
 	const [cruces, setCruces] = useState([])
@@ -234,7 +228,7 @@ export function DataProvider({ children }) {
 		}
 
 		// Solo cargar si hay autenticación
-		if (!isAuthenticated()) {
+		if (!checkAuth()) {
 			setIsESP32Connected(false)
 			setError('No autenticado. Por favor, inicia sesión.')
 			setCruces([])
@@ -452,14 +446,18 @@ export function DataProvider({ children }) {
 
 	// Efecto para cargar datos iniciales y conectar Socket.IO
 	useEffect(() => {
-		if (user && isAuthenticated()) {
+		if (user && checkAuth()) {
 			// Cargar solo datos básicos inicialmente (sin detalles completos)
 			// Los detalles se cargarán vía Socket.IO o bajo demanda
 			loadESP32Data(false)
 
-			// Cargar usuarios y logs del sistema
-			loadUsuarios()
-			loadLogs()
+			// Cargar usuarios y logs del sistema solo si el usuario tiene permisos
+			if (hasPermission('canViewUsuarios')) {
+				loadUsuarios()
+			}
+			if (hasPermission('canViewLogs')) {
+				loadLogs()
+			}
 
 			// Conectar Socket.IO
 			const token = getAccessToken()
@@ -474,11 +472,12 @@ export function DataProvider({ children }) {
 		} else {
 			// Si no hay usuario, desconectar Socket.IO y limpiar datos
 			disconnectSocket()
+			setCruces([])
 			setUsuarios([])
 			setLogs([])
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [user])
+	}, [user, hasPermission])
 	
 	// ✅ NUEVO: Sincronizar crucesRef con cruces
 	useEffect(() => {
@@ -487,7 +486,7 @@ export function DataProvider({ children }) {
 	
 	// ✅ CORRECCIÓN CRÍTICA: Suscribirse SOLO cuando cambia el conjunto de IDs (no en cada actualización)
 	useEffect(() => {
-		if (!user || !isAuthenticated()) {
+		if (!user || !checkAuth()) {
 			return
 		}
 		
@@ -543,7 +542,7 @@ export function DataProvider({ children }) {
 
 	// Efecto para escuchar eventos de Socket.IO y actualizar estado en tiempo real
 	useEffect(() => {
-		if (!user || !isAuthenticated()) {
+		if (!user || !checkAuth()) {
 			return
 		}
 
@@ -960,7 +959,15 @@ export function DataProvider({ children }) {
 
 	// Función para cargar usuarios del backend
 	const loadUsuarios = async () => {
-		if (!isAuthenticated()) return
+		if (!checkAuth()) return
+		
+		// Verificar permisos antes de cargar
+		if (!hasPermission('canViewUsuarios')) {
+			if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+				console.log('⏸️ Usuario no tiene permisos para ver usuarios, omitiendo carga...')
+			}
+			return
+		}
 		
 		// Prevenir llamadas concurrentes
 		if (isLoadingUsuariosRef.current) {
@@ -1134,7 +1141,15 @@ export function DataProvider({ children }) {
 
 	// Función para cargar logs del backend
 	const loadLogs = useCallback(async (params = {}) => {
-		if (!isAuthenticated()) return
+		if (!checkAuth()) return
+		
+		// Verificar permisos antes de cargar
+		if (!hasPermission('canViewLogs')) {
+			if (import.meta.env.VITE_DEBUG_MODE === 'true') {
+				console.log('⏸️ Usuario no tiene permisos para ver logs, omitiendo carga...')
+			}
+			return
+		}
 		
 		// Prevenir llamadas concurrentes
 		if (isLoadingLogsRef.current) {
@@ -1195,39 +1210,8 @@ export function DataProvider({ children }) {
 		}, 1000)
 	}
 
-	// Función de login con persistencia
-	const login = async (email, password) => {
-		try {
-			const response = await apiLogin(email, password)
-			setUser(response.user)
-			
-			const isAdminUser = response.user?.profile?.role === 'ADMIN' || response.user?.profile?.role === 'MAINTENANCE'
-			setIsAdmin(isAdminUser)
-			
-			agregarLog()
-			
-			// Socket.IO se conectará automáticamente y cargará los datos iniciales
-			// No necesitamos llamar a loadESP32Data() aquí, el useEffect lo hará
-			
-			return true
-		} catch (error) {
-			agregarLog()
-			throw error
-		}
-	}
-
-	const logout = async () => {
-		try {
-			await apiLogout()
-		} catch (error) {
-			console.warn('Error al cerrar sesión en el servidor:', error)
-		} finally {
-			agregarLog()
-			setUser(null)
-			setIsAdmin(false)
-			setCruces([])
-		}
-	}
+	// Login y logout ahora están en AuthContext
+	// El DataContext solo maneja datos de cruces, usuarios, logs, etc.
 
 	// Calcular estadísticas
 	const stats = {
@@ -1247,8 +1231,6 @@ export function DataProvider({ children }) {
 		usuarios,
 		logs,
 		configuracion,
-		user,
-		isAdmin,
 		stats,
 		isLoading,
 		isLoadingUsuarios,
@@ -1269,10 +1251,8 @@ export function DataProvider({ children }) {
 		loadUsuarios,
 		loadLogs,
 		setConfiguracion,
-		login,
-		logout,
 		agregarLog,
-		loadESP32Data
+		loadESP32Data,
 	}
 
 	return (
