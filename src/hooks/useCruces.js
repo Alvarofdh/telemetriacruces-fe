@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { checkHealth, getCruces, getCruce, createCruce, updateCruce, deleteCruce, getTelemetria, getAlertas } from '../services'
 import { useAuth } from './useAuth'
+import { normalizeCruceData } from '../utils/telemetriaHelpers'
 import toast from 'react-hot-toast'
 
 // Logging condicional
@@ -60,27 +61,48 @@ const crucesBackup = [
 	},
 ]
 
-// Normalizar datos de cruces para consistencia
-const normalizarCruce = (cruce) => ({
-	id_cruce: cruce.id || cruce.id_cruce,
-	nombre: cruce.nombre || 'Sin nombre',
-	ubicacion: cruce.ubicacion || 'Sin ubicación',
-	estado: cruce.estado || 'ACTIVO',
-	coordenadas: {
-		lat: cruce.coordenadas_lat || cruce.coordenadas?.lat || 0,
-		lng: cruce.coordenadas_lng || cruce.coordenadas?.lng || 0,
-	},
-	bateria: cruce.bateria || 0,
-	sensoresActivos: cruce.sensoresActivos || 0,
-	ultimaActividad: cruce.ultimaActividad || cruce.updated_at || cruce.created_at,
-	tipoTren: cruce.tipoTren,
-	velocidadPromedio: cruce.velocidadPromedio,
-	fechaInstalacion: cruce.fechaInstalacion || cruce.instalacion,
-	ultimoMantenimiento: cruce.ultimoMantenimiento,
-	responsable: cruce.responsable || cruce.contacto?.responsable,
-	telefono: cruce.telefono || cruce.contacto?.telefono,
-	...cruce,
-})
+// ✅ CORRECCIÓN: Normalizar datos de cruces usando normalizeCruceData cuando hay telemetria_actual
+const normalizarCruce = (cruce) => {
+	// Si el cruce tiene telemetria_actual del backend, usar normalizeCruceData
+	if (cruce.telemetria_actual || cruce.ultima_telemetria) {
+		const normalized = normalizeCruceData(cruce)
+		return {
+			...normalized,
+			// Mantener campos adicionales y asegurar id_cruce
+			id_cruce: cruce.id || cruce.id_cruce || normalized.id,
+			coordenadas: {
+				lat: cruce.coordenadas_lat || cruce.coordenadas?.lat || normalized.coordenadas_lat || 0,
+				lng: cruce.coordenadas_lng || cruce.coordenadas?.lng || normalized.coordenadas_lng || 0,
+			},
+			fechaInstalacion: cruce.fechaInstalacion || cruce.instalacion || normalized.instalacion,
+			ultimoMantenimiento: cruce.ultimoMantenimiento || normalized.ultimoMantenimiento,
+			responsable: cruce.responsable || cruce.contacto?.responsable || normalized.responsable,
+			telefono: cruce.telefono || cruce.contacto?.telefono || normalized.telefono,
+		}
+	}
+	
+	// Fallback para cruces sin telemetría (mantener compatibilidad)
+	return {
+		id_cruce: cruce.id || cruce.id_cruce,
+		nombre: cruce.nombre || 'Sin nombre',
+		ubicacion: cruce.ubicacion || 'Sin ubicación',
+		estado: cruce.estado || 'ACTIVO',
+		coordenadas: {
+			lat: cruce.coordenadas_lat || cruce.coordenadas?.lat || 0,
+			lng: cruce.coordenadas_lng || cruce.coordenadas?.lng || 0,
+		},
+		bateria: cruce.bateria || 0,
+		sensoresActivos: cruce.sensoresActivos || 0,
+		ultimaActividad: cruce.ultimaActividad || cruce.updated_at || cruce.created_at,
+		tipoTren: cruce.tipoTren,
+		velocidadPromedio: cruce.velocidadPromedio,
+		fechaInstalacion: cruce.fechaInstalacion || cruce.instalacion,
+		ultimoMantenimiento: cruce.ultimoMantenimiento,
+		responsable: cruce.responsable || cruce.contacto?.responsable,
+		telefono: cruce.telefono || cruce.contacto?.telefono,
+		...cruce,
+	}
+}
 
 // Query keys para React Query
 const crucesKeys = {
@@ -186,19 +208,17 @@ export const useCruces = () => {
 				crucesQuery.data.map(async (cruce) => {
 					try {
 						const cruceDetalle = await getCruce(cruce.id_cruce)
-						const telemetriaResponse = await getTelemetria({ cruce: cruce.id_cruce, page: 1 })
 						const alertasResponse = await getAlertas({ cruce: cruce.id_cruce, resolved: false, page: 1 })
 						
-						const telemetriaReciente = telemetriaResponse.results?.[0] || null
 						const alertasActivas = alertasResponse.results || []
+						
+						// ✅ CORRECCIÓN: Usar normalizeCruceData que ya procesa telemetria_actual del backend
+						const cruceNormalizado = normalizarCruce(cruceDetalle)
 						
 						updateCruceInState(cruce.id_cruce, (c) => ({
 							...c,
-							...normalizarCruce(cruceDetalle),
-							bateria: telemetriaReciente?.battery_voltage ? Math.round(telemetriaReciente.battery_voltage * 10) : c.bateria,
+							...cruceNormalizado,
 							alertasActivas: alertasActivas.length,
-							telemetriaReciente,
-							alertasActivas,
 						}))
 					} catch (err) {
 						debugWarn(`⚠️ Error al cargar detalles del cruce ${cruce.id_cruce}:`, err)

@@ -235,55 +235,47 @@ export function AlertSystem() {
 	}, [activeAlerts, filterType, searchTerm])
 
 	const getAlertStyles = (type) => {
-		switch (type) {
-			case 'CRITICAL':
-				return 'bg-white dark:bg-gray-800 border-l-4 border-red-500 dark:border-red-400'
-			case 'WARNING':
-				return 'bg-white dark:bg-gray-800 border-l-4 border-yellow-500 dark:border-yellow-400'
-			case 'INFO':
-				return 'bg-white dark:bg-gray-800 border-l-4 border-blue-500 dark:border-blue-400'
-			default:
-				return 'bg-white dark:bg-gray-800 border-l-4 border-gray-500 dark:border-gray-400'
-		}
+		// ✅ Sin bordes de color, solo borde estándar
+		return 'bg-white dark:bg-gray-800'
 	}
 
 	const getAlertIconBg = (type) => {
 		switch (type) {
 			case 'CRITICAL':
-				return 'bg-red-100 dark:bg-red-900 rounded-xl'
+				return 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
 			case 'WARNING':
-				return 'bg-yellow-100 dark:bg-yellow-900 rounded-xl'
+				return 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800'
 			case 'INFO':
-				return 'bg-blue-100 dark:bg-blue-900 rounded-xl'
+				return 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
 			default:
-				return 'bg-gray-100 dark:bg-gray-700 rounded-xl'
+				return 'bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600'
 		}
 	}
 
 	const getAlertTextColor = (type) => {
 		switch (type) {
 			case 'CRITICAL':
-				return 'text-red-600 dark:text-red-400'
+				return 'text-gray-900 dark:text-gray-100'
 			case 'WARNING':
-				return 'text-yellow-600 dark:text-yellow-400'
+				return 'text-gray-900 dark:text-gray-100'
 			case 'INFO':
-				return 'text-blue-600 dark:text-blue-400'
+				return 'text-gray-900 dark:text-gray-100'
 			default:
 				return 'text-gray-900 dark:text-gray-100'
 		}
 	}
 
 	const getAlertBadge = (type) => {
-		const baseClasses = 'px-3 py-1.5 text-xs font-semibold rounded-lg uppercase tracking-wider'
+		const baseClasses = 'px-2.5 py-1 text-xs font-medium rounded-md uppercase tracking-wide'
 		switch (type) {
 			case 'CRITICAL':
-				return `${baseClasses} bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300`
+				return `${baseClasses} bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800`
 			case 'WARNING':
-				return `${baseClasses} bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300`
+				return `${baseClasses} bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800`
 			case 'INFO':
-				return `${baseClasses} bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300`
+				return `${baseClasses} bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800`
 			default:
-				return `${baseClasses} bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300`
+				return `${baseClasses} bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600`
 		}
 	}
 
@@ -472,64 +464,61 @@ export function AlertSystem() {
 					filteredAlerts.map((alert, index) => (
 						<div
 							key={`${alert.id}-${alert.cruce.id_cruce}-${index}`}
-							className={`${getAlertStyles(alert.type)} rounded-xl p-5 lg:p-6 shadow-md hover:shadow-lg transition-all duration-300 border border-gray-200 dark:border-gray-700`}
+							className={`${getAlertStyles(alert.type)} rounded-lg p-4 lg:p-5 shadow-sm hover:shadow-md transition-all duration-200 border border-gray-200 dark:border-gray-700`}
 						>
 							<div className="flex flex-col lg:flex-row lg:items-start gap-4">
 								{/* Icono */}
-								<div className={`w-14 h-14 lg:w-16 lg:h-16 ${getAlertIconBg(alert.type)} flex items-center justify-center shrink-0`}>
-									{AlertIcons[alert.icon] ? AlertIcons[alert.icon]("w-8 h-8 lg:w-10 lg:h-10") : AlertIcons.warning("w-8 h-8 lg:w-10 lg:h-10")}
+								<div className={`w-12 h-12 ${getAlertIconBg(alert.type)} rounded-lg flex items-center justify-center shrink-0`}>
+									{AlertIcons[alert.icon] ? AlertIcons[alert.icon](`w-6 h-6 ${getAlertTextColor(alert.type)}`) : AlertIcons.warning(`w-6 h-6 ${getAlertTextColor(alert.type)}`)}
 								</div>
 
 								{/* Contenido */}
 								<div className="flex-1 min-w-0">
 									{/* Header */}
-									<div className="flex flex-wrap items-center gap-2 mb-3">
+									<div className="flex flex-wrap items-center gap-2 mb-2">
 										<span className={getAlertBadge(alert.type)}>
 											{alert.type}
 										</span>
-										<span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+										<span className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-md bg-gray-50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-400">
 											<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
 											</svg>
 											{alert.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
 										</span>
-										<span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
-											<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-											</svg>
+										<span className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-md bg-gray-50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-400">
 											Prioridad {alert.priority}
 										</span>
 									</div>
 
 									{/* Mensaje */}
-									<h3 className={`font-bold text-lg lg:text-xl mb-3 ${getAlertTextColor(alert.type)}`}>
+									<h3 className={`font-semibold text-base lg:text-lg mb-2 ${getAlertTextColor(alert.type)}`}>
 										{alert.message(alert.cruce)}
 									</h3>
 
 									{/* Acción */}
-									<div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 mb-4 border border-gray-200 dark:border-gray-600">
+									<div className="bg-gray-50 dark:bg-gray-700/30 rounded-md p-3 mb-3 border border-gray-100 dark:border-gray-700">
 										<div className="flex items-start gap-2">
-											<svg className="w-5 h-5 text-gray-600 dark:text-gray-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<svg className="w-4 h-4 text-gray-500 dark:text-gray-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
 											</svg>
 											<div>
-												<p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Acción recomendada:</p>
-												<p className="text-sm text-gray-600 dark:text-gray-400">{alert.action}</p>
+												<p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-0.5">Acción recomendada:</p>
+												<p className="text-sm text-gray-700 dark:text-gray-300">{alert.action}</p>
 											</div>
 										</div>
 									</div>
 
 									{/* Detalles */}
 									<div className="flex flex-wrap gap-2">
-										<span className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-xs font-medium">
-											<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-400 rounded-md text-xs font-medium">
+											<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
 												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
 											</svg>
 											{alert.cruce.ubicacion}
 										</span>
-										<span className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-xs font-medium">
-											<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-400 rounded-md text-xs font-medium">
+											<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
 											</svg>
 											{alert.cruce.nombre}
@@ -545,9 +534,9 @@ export function AlertSystem() {
 											duration: 3000
 										})
 									}}
-									className="px-6 py-3 text-sm font-semibold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600 shrink-0 w-full lg:w-auto"
+									className="px-4 py-2.5 text-sm font-medium bg-gray-50 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-600 shrink-0 w-full lg:w-auto"
 								>
-									✓ Reconocer
+									Reconocer
 								</button>
 							</div>
 						</div>

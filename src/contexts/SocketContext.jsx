@@ -4,6 +4,7 @@ import { getAccessToken } from '../services/httpClient'
 import { useAuth } from '../hooks/useAuth'
 import { useContext } from 'react'
 import { CrucesContext } from './CrucesContext'
+import { normalizeCruceData, voltageToPercentage } from '../utils/telemetriaHelpers'
 
 // Logging condicional
 const IS_DEBUG = import.meta.env.VITE_DEBUG_MODE === 'true'
@@ -131,20 +132,34 @@ export function SocketProvider({ children }) {
 			debugLog('📊 Dashboard actualizado:', data)
 		}
 
+		// ✅ CORRECCIÓN: Usar normalizeCruceData de helpers para consumir telemetria_actual correctamente
 		const transformCruceData = (cruceData) => {
-			if (cruceData.id_cruce) {
+			// Si ya está normalizado, retornarlo
+			if (cruceData.id_cruce && cruceData.bateria !== undefined) {
 				return cruceData
 			}
 
-			const telemetria = cruceData.telemetria || cruceData.ultima_telemetria
-			const batteryVoltage = telemetria?.battery_voltage || 0
-			const bateriaPorcentaje = batteryVoltage > 0 
-				? Math.min(100, Math.max(0, ((batteryVoltage - 10) / (14.4 - 10)) * 100))
-				: 0
+			// Usar normalizeCruceData si tiene telemetria_actual
+			if (cruceData.telemetria_actual || cruceData.ultima_telemetria || cruceData.telemetria) {
+				// Normalizar el objeto para que tenga la estructura esperada
+				const cruceParaNormalizar = {
+					...cruceData,
+					telemetria_actual: cruceData.telemetria_actual || cruceData.ultima_telemetria || cruceData.telemetria,
+				}
+				const normalized = normalizeCruceData(cruceParaNormalizar)
+				return {
+					...normalized,
+					id_cruce: cruceData.id || cruceData.id_cruce || normalized.id,
+					coordenadas: {
+						lat: cruceData.coordenadas_lat || cruceData.coordenadas?.lat || normalized.coordenadas_lat || 0,
+						lng: cruceData.coordenadas_lng || cruceData.coordenadas?.lng || normalized.coordenadas_lng || 0,
+					},
+					alertas: cruceData.alertas || [],
+					alertasActivas: (cruceData.alertas || []).filter(a => !a.resolved).length,
+				}
+			}
 
-			const sensores = cruceData.sensores || []
-			const sensoresActivos = sensores.filter(s => s.activo !== false).length
-
+			// Fallback para datos sin telemetría
 			return {
 				id_cruce: cruceData.id || cruceData.id_cruce,
 				nombre: cruceData.nombre,
@@ -154,24 +169,10 @@ export function SocketProvider({ children }) {
 					lat: cruceData.coordenadas_lat || 0,
 					lng: cruceData.coordenadas_lng || 0,
 				},
-				bateria: Math.round(bateriaPorcentaje),
-				voltage: telemetria?.barrier_voltage || 0,
-				battery_voltage: telemetria?.battery_voltage || 0,
-				temperature: telemetria?.temperature || 0,
-				barrier_state: telemetria?.barrier_status || null,
-				signal_strength: telemetria?.signal_strength || 0,
-				rssi: telemetria?.signal_strength || 0,
-				sensor_1: telemetria?.sensor_1 || null,
-				sensor_2: telemetria?.sensor_2 || null,
-				sensor_3: telemetria?.sensor_3 || null,
-				sensor_4: telemetria?.sensor_4 || null,
-				ultimaActividad: telemetria?.timestamp || cruceData.updated_at || cruceData.created_at,
-				sensores: sensores,
-				sensoresActivos: sensoresActivos,
-				alertas: cruceData.alertas || [],
-				alertasActivas: (cruceData.alertas || []).filter(a => !a.resolved).length,
+				bateria: cruceData.bateria || 0,
+				sensoresActivos: cruceData.sensoresActivos || 0,
+				ultimaActividad: cruceData.ultimaActividad || cruceData.updated_at || cruceData.created_at,
 				...cruceData,
-				telemetria: telemetria,
 			}
 		}
 
@@ -187,26 +188,26 @@ export function SocketProvider({ children }) {
 			if (!cruceId) return
 
 			updateCruceInState(cruceId, (cruce) => {
-				const batteryVoltage = telemetriaData.battery_voltage || 0
-				const bateriaPorcentaje = batteryVoltage > 0 
-					? Math.min(100, Math.max(0, ((batteryVoltage - 10) / (14.4 - 10)) * 100))
-					: cruce.bateria
+				// ✅ CORRECCIÓN: Usar voltageToPercentage de helpers para calcular batería correctamente
+				const batteryVoltage = telemetriaData.battery_voltage
+				const batteryPercentage = batteryVoltage ? voltageToPercentage(batteryVoltage) : cruce.bateria
 
 				return {
 					...cruce,
-					bateria: Math.round(bateriaPorcentaje),
+					bateria: batteryPercentage,
 					voltage: telemetriaData.barrier_voltage || cruce.voltage,
 					battery_voltage: telemetriaData.battery_voltage || cruce.battery_voltage,
-					temperature: telemetriaData.temperature || cruce.temperature,
+					temperature: telemetriaData.temperature !== undefined ? telemetriaData.temperature : cruce.temperature,
 					barrier_state: telemetriaData.barrier_status || cruce.barrier_state,
-					signal_strength: telemetriaData.signal_strength || cruce.signal_strength,
-					rssi: telemetriaData.signal_strength || cruce.rssi,
+					signal_strength: telemetriaData.signal_strength !== undefined ? telemetriaData.signal_strength : cruce.signal_strength,
+					rssi: telemetriaData.signal_strength !== undefined ? telemetriaData.signal_strength : cruce.rssi,
 					sensor_1: telemetriaData.sensor_1 !== undefined ? telemetriaData.sensor_1 : cruce.sensor_1,
 					sensor_2: telemetriaData.sensor_2 !== undefined ? telemetriaData.sensor_2 : cruce.sensor_2,
 					sensor_3: telemetriaData.sensor_3 !== undefined ? telemetriaData.sensor_3 : cruce.sensor_3,
 					sensor_4: telemetriaData.sensor_4 !== undefined ? telemetriaData.sensor_4 : cruce.sensor_4,
 					ultimaActividad: telemetriaData.timestamp || new Date().toISOString(),
 					telemetria: telemetriaData,
+					telemetria_actual: telemetriaData, // Mantener referencia a telemetría actual
 				}
 			})
 		}

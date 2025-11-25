@@ -40,12 +40,14 @@ export const useUsuarios = () => {
 					: usuario.email,
 				first_name: usuario.first_name,
 				last_name: usuario.last_name,
-				role: usuario.profile?.role || usuario.role || 'OBSERVER',
+				rol: usuario.profile?.role || usuario.role || usuario.rol || 'OBSERVER', // ✅ Compatibilidad: usar 'rol' para consistencia
+				role: usuario.profile?.role || usuario.role || usuario.rol || 'OBSERVER', // Mantener 'role' también para compatibilidad
 				estado: usuario.is_active !== undefined ? (usuario.is_active ? 'ACTIVO' : 'INACTIVO') : 'ACTIVO',
 				is_active: usuario.is_active !== undefined ? usuario.is_active : true,
-				profile: usuario.profile || { role: usuario.role || 'OBSERVER' },
+				profile: usuario.profile || { role: usuario.role || usuario.rol || 'OBSERVER' },
 				created_at: usuario.created_at,
 				updated_at: usuario.updated_at,
+				ultimoAcceso: usuario.last_login || usuario.ultimoAcceso || null,
 			}))
 		},
 		enabled: hasPermission('canViewUsuarios'),
@@ -72,12 +74,14 @@ export const useUsuarios = () => {
 			: usuario.email,
 		first_name: usuario.first_name,
 		last_name: usuario.last_name,
-		role: usuario.profile?.role || usuario.role || 'OBSERVER',
+		rol: usuario.profile?.role || usuario.role || usuario.rol || 'OBSERVER', // ✅ Compatibilidad: usar 'rol' para consistencia
+		role: usuario.profile?.role || usuario.role || usuario.rol || 'OBSERVER', // Mantener 'role' también para compatibilidad
 		estado: usuario.is_active !== undefined ? (usuario.is_active ? 'ACTIVO' : 'INACTIVO') : 'ACTIVO',
 		is_active: usuario.is_active !== undefined ? usuario.is_active : true,
-		profile: usuario.profile || { role: usuario.role || 'OBSERVER' },
+		profile: usuario.profile || { role: usuario.role || usuario.rol || 'OBSERVER' },
 		created_at: usuario.created_at,
 		updated_at: usuario.updated_at,
+		ultimoAcceso: usuario.last_login || usuario.ultimoAcceso || null,
 	})
 
 	// Mutation para crear usuario

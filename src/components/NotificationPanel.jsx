@@ -1,24 +1,24 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import toast from 'react-hot-toast'
 import { getAlertas } from '../services/alertas'
 import { getNotificationSettings } from '../services/notifications'
 import { getSocket } from '../services/socket'
-import { useSocketSubscription } from '../hooks/useSocketSubscription'
 
 // ✅ CORRECCIÓN: Inicializar como deshabilitado hasta cargar settings del usuario
 const DEFAULT_SETTINGS = {
-	enable_notifications: false, // Deshabilitado por defecto hasta cargar preferencias
-	notify_critical_alerts: false,
-	notify_warning_alerts: false,
-	notify_info_alerts: false,
-	notify_barrier_events: false,
-	notify_battery_low: false,
-	notify_communication_lost: false,
-	notify_gabinete_open: false,
+	enable_notifications: true, // Deshabilitado por defecto hasta cargar preferencias
+	notify_critical_alerts: true,
+	notify_warning_alerts: true,
+	notify_info_alerts: true,
+	notify_barrier_events: true,
+	notify_battery_low: true,
+	notify_communication_lost: true,
+	notify_gabinete_open: true,
 }
 
 const MAX_ITEMS = 30
 const VISIBLE_ITEMS = 3
+const READ_NOTIFICATIONS_KEY = 'read_notifications'
 
 const NotificationIcons = {
 	panel: (
@@ -144,18 +144,46 @@ export function NotificationPanel() {
 	const unreadRealtime = useMemo(() => realtimeNotifications.filter(alerta => !alerta.read).length, [realtimeNotifications])
 	const totalUnread = unreadRest + unreadRealtime
 
+	// ✅ CORRECCIÓN: Cargar notificaciones leídas desde localStorage
+	const getReadNotifications = useCallback(() => {
+		try {
+			const stored = localStorage.getItem(READ_NOTIFICATIONS_KEY)
+			return stored ? JSON.parse(stored) : []
+		} catch (error) {
+			console.error('Error al cargar notificaciones leídas:', error)
+			return []
+		}
+	}, [])
+
+	// ✅ CORRECCIÓN: Guardar notificaciones leídas en localStorage
+	const saveReadNotifications = useCallback((readIds) => {
+		try {
+			localStorage.setItem(READ_NOTIFICATIONS_KEY, JSON.stringify(readIds))
+		} catch (error) {
+			console.error('Error al guardar notificaciones leídas:', error)
+		}
+	}, [])
+
 	const loadAlerts = useCallback(async () => {
 		setIsLoadingAlerts(true)
 		try {
 			const response = await getAlertas({ resolved: false, page_size: MAX_ITEMS })
-			const lista = (response?.results || response || []).map(normalizeAlert)
+			const readIds = getReadNotifications()
+			const lista = (response?.results || response || []).map(alert => {
+				const normalized = normalizeAlert(alert)
+				// ✅ CORRECCIÓN: Verificar si ya fue leída desde localStorage
+				return {
+					...normalized,
+					read: normalized.read || readIds.includes(alert.id)
+				}
+			})
 			setAlerts(lista)
 		} catch (error) {
 			toast.error(error.message || 'No se pudieron cargar las alertas')
 		} finally {
 			setIsLoadingAlerts(false)
 		}
-	}, [])
+	}, [getReadNotifications])
 
 	const loadSettings = useCallback(async () => {
 		try {
@@ -177,11 +205,38 @@ export function NotificationPanel() {
 	}, [loadAlerts, loadSettings])
 
 	const shouldProcessNotification = useCallback((payload) => {
+		// ✅ CORRECCIÓN CRÍTICA: Verificar severidad PRIMERO, antes de cualquier otra verificación
+		// Las alertas CRITICAL siempre se muestran, independientemente de settings
+		// Buscar severidad en múltiples ubicaciones posibles
+		const severityRaw = payload.severity || 
+			payload.metadata?.severity || 
+			payload.data?.severity ||
+			(payload.type === 'alerta' && payload.data?.data?.severity) ||
+			'INFO'
+		
+		const severity = normalizeSeverity(severityRaw)
+		console.log('🔍 [NotificationPanel] Severidad detectada:', severity, '| Raw:', severityRaw, '| Payload keys:', Object.keys(payload))
+		
+		// ✅ CRÍTICO: Las alertas CRITICAL siempre se muestran, sin importar settings
+		if (severity === 'CRITICAL' || severityRaw === 'CRITICAL' || severityRaw === 'error' || payload.severity === 'CRITICAL') {
+			console.log('🚨 [NotificationPanel] Alerta CRÍTICA detectada, mostrando SIEMPRE (ignorando settings):', payload)
+			return true
+		}
+
+		// ✅ CORRECCIÓN: Si las settings no están cargadas, permitir todas las notificaciones
+		// Esto evita que se pierdan notificaciones mientras se cargan las preferencias
+		if (!settingsLoaded) {
+			console.log('⚠️ [NotificationPanel] Settings no cargadas, permitiendo notificación:', payload)
+			return true
+		}
+
+		// Si las notificaciones están deshabilitadas, filtrar (excepto críticas que ya se procesaron arriba)
 		if (!settings.enable_notifications) {
+			console.log('⚠️ [NotificationPanel] Notificaciones deshabilitadas en settings')
 			return false
 		}
-		const severity = normalizeSeverity(payload.severity || payload.metadata?.severity)
-		if (severity === 'CRITICAL' && !settings.notify_critical_alerts) return false
+
+		// Aplicar filtros según settings para alertas no críticas
 		if (severity === 'WARNING' && !settings.notify_warning_alerts) return false
 		if (severity === 'INFO' && !settings.notify_info_alerts) return false
 
@@ -191,68 +246,213 @@ export function NotificationPanel() {
 		if (eventName.includes('communication') && !settings.notify_communication_lost) return false
 		if (eventName.includes('gabinete') && !settings.notify_gabinete_open) return false
 		return true
-	}, [settings])
+	}, [settings, settingsLoaded])
 
 	// Handler para notificaciones de socket
 	const handleSocketNotification = useCallback((payload) => {
+		console.log('🔔 [NotificationPanel] Evento recibido:', payload)
+		
 		if (!shouldProcessNotification(payload)) {
+			console.log('⚠️ [NotificationPanel] Notificación filtrada por settings:', payload)
 			return
 		}
+		
+		console.log('✅ [NotificationPanel] Procesando notificación:', payload)
+		
 		const normalized = normalizeRealtimeNotification(payload)
-		setRealtimeNotifications(prev => [normalized, ...prev].slice(0, MAX_ITEMS))
+		console.log('📝 [NotificationPanel] Notificación normalizada:', normalized)
+		
+		// ✅ CORRECCIÓN: Verificar si ya fue leída desde localStorage
+		const readIds = getReadNotifications()
+		if (readIds.includes(normalized.id)) {
+			normalized.read = true
+		}
+		
+		setRealtimeNotifications(prev => {
+			const updated = [normalized, ...prev].slice(0, MAX_ITEMS)
+			console.log('📊 [NotificationPanel] Estado actualizado, total notificaciones:', updated.length)
+			return updated
+		})
 
 		const severity = normalized.severity || 'INFO'
 		const severityEntry = severityConfig[severity] || severityConfig.INFO
 		severityEntry.toast(`${normalized.title}: ${normalized.message}`)
 
-		if (payload.event === 'alert_created' || payload.event === 'alerta_resuelta') {
+		if (payload.event === 'alert_created' || payload.event === 'alerta_resuelta' || payload.type === 'alerta') {
+			console.log('🔄 [NotificationPanel] Recargando alertas desde API...')
 			loadAlerts()
 		}
-	}, [shouldProcessNotification, loadAlerts])
+	}, [shouldProcessNotification, loadAlerts, getReadNotifications])
 
-	// ✅ CORRECCIÓN: Solo suscribirse después de cargar settings
-	// Manejar unión a room de notificaciones cuando el socket se conecta
+	// ✅ CORRECCIÓN: Unirse a ambas salas (notifications y alertas) para asegurar recepción
+	// Manejar unión a rooms de notificaciones cuando el socket se conecta
 	useEffect(() => {
-		const socket = getSocket()
-		// No suscribirse hasta que las settings estén cargadas
-		if (!socket || !settingsLoaded || !settings.enable_notifications) {
-			return
-		}
+		// ✅ CORRECCIÓN: Intentar obtener socket, si no existe esperar un poco y reintentar
+		const setupSocket = () => {
+			const socket = getSocket()
+			if (!socket) {
+				console.warn('⚠️ [NotificationPanel] Socket no disponible, reintentando en 1 segundo...')
+				setTimeout(setupSocket, 1000)
+				return
+			}
 
-		const joinNotificationsRoom = () => {
-			if (settings.enable_notifications) {
+			console.log('✅ [NotificationPanel] Socket encontrado, estado:', socket.connected ? 'conectado' : 'desconectado')
+
+			// ✅ CORRECCIÓN: No esperar a settings - unirse siempre a las salas
+			// El backend automáticamente une a 'notifications' al conectar, pero nos aseguramos
+			const joinNotificationRooms = () => {
+				if (!socket.connected) {
+					console.warn('⚠️ [NotificationPanel] Socket no conectado, esperando conexión...')
+					return
+				}
+
+				// ✅ CORRECCIÓN: Unirse a ambas salas siempre (el filtrado se hace en shouldProcessNotification)
+				console.log('🔔 [NotificationPanel] Uniéndose a salas: notifications, alertas')
 				socket.emit('join_room', { room: 'notifications' })
+				socket.emit('join_room', { room: 'alertas' })
+				
+				// También suscribirse a eventos de alertas
+				socket.emit('subscribe', { events: ['alertas', 'notifications'] })
+				
+				console.log('✅ [NotificationPanel] Suscripción completada')
 			}
-		}
 
-		if (socket.connected) {
-			joinNotificationsRoom()
-		}
-
-		socket.on('connect', joinNotificationsRoom)
-
-		return () => {
-			socket.off('connect', joinNotificationsRoom)
+			// Intentar unirse inmediatamente si ya está conectado
 			if (socket.connected) {
-				socket.emit('leave_room', { room: 'notifications' })
+				joinNotificationRooms()
+			}
+
+			// También unirse cuando se autentica (evento 'connected')
+			const handleConnected = () => {
+				console.log('✅ [NotificationPanel] Socket conectado/autenticado, uniéndose a salas')
+				joinNotificationRooms()
+			}
+
+			socket.on('connect', handleConnected)
+			socket.on('connected', handleConnected) // Evento de autenticación del backend
+			socket.on('joined_room', (data) => {
+				console.log('✅ [NotificationPanel] Confirmación de unión a sala:', data)
+			})
+			socket.on('subscribed', (data) => {
+				console.log('✅ [NotificationPanel] Confirmación de suscripción:', data)
+			})
+
+			return () => {
+				socket.off('connect', handleConnected)
+				socket.off('connected', handleConnected)
+				socket.off('joined_room')
+				socket.off('subscribed')
+				if (socket.connected) {
+					socket.emit('leave_room', { room: 'notifications' })
+					socket.emit('leave_room', { room: 'alertas' })
+				}
 			}
 		}
-	}, [settings.enable_notifications, settingsLoaded])
 
-	// ✅ CORRECCIÓN: Solo suscribirse después de cargar settings
-	// Usar hook de suscripción para notificaciones
-	useSocketSubscription({
-		events: 'notification',
-		handlers: handleSocketNotification,
-		rooms: (settingsLoaded && settings.enable_notifications) ? ['notifications'] : [],
-		enabled: settingsLoaded && settings.enable_notifications
-	}, [handleSocketNotification, settings.enable_notifications, settingsLoaded])
+		const cleanup = setupSocket()
+		return cleanup
+	}, []) // ✅ CORRECCIÓN: Ejecutar solo una vez al montar, no depender de settings
+
+	// ✅ CORRECCIÓN: Usar un solo sistema de listeners para evitar duplicación
+	// Usar listeners directos con deduplicación para evitar procesar la misma alerta múltiples veces
+	const processedAlertsRef = useRef(new Set())
+	
+	useEffect(() => {
+		const setupDirectListeners = () => {
+			const socket = getSocket()
+			if (!socket) {
+				console.warn('⚠️ [NotificationPanel] Socket no disponible, reintentando...')
+				setTimeout(setupDirectListeners, 1000)
+				return
+			}
+
+			console.log('✅ [NotificationPanel] Configurando listeners al socket (solo una vez)')
+
+			const handleNotificationDirect = (payload) => {
+				// ✅ CORRECCIÓN: Deduplicación - evitar procesar la misma alerta múltiples veces
+				const alertId = payload.metadata?.alerta_id || payload.data?.id || payload.id || JSON.stringify(payload)
+				const alertKey = `notification-${alertId}-${payload.timestamp || Date.now()}`
+				
+				if (processedAlertsRef.current.has(alertKey)) {
+					console.log('⚠️ [NotificationPanel] Alerta ya procesada, ignorando duplicado:', alertKey)
+					return
+				}
+				
+				processedAlertsRef.current.add(alertKey)
+				// Limpiar alertas procesadas después de 5 minutos para evitar acumulación de memoria
+				setTimeout(() => processedAlertsRef.current.delete(alertKey), 5 * 60 * 1000)
+				
+				console.log('🔔 [NotificationPanel] Evento notification recibido:', payload)
+				handleSocketNotification(payload)
+			}
+
+			const handleNewAlertaDirect = (alertaData) => {
+				// ✅ CORRECCIÓN: Deduplicación - evitar procesar la misma alerta múltiples veces
+				const eventData = alertaData.data || alertaData
+				const alertId = eventData.id || JSON.stringify(alertaData)
+				const alertKey = `new_alerta-${alertId}-${eventData.created_at || Date.now()}`
+				
+				if (processedAlertsRef.current.has(alertKey)) {
+					console.log('⚠️ [NotificationPanel] Alerta ya procesada, ignorando duplicado:', alertKey)
+					return
+				}
+				
+				processedAlertsRef.current.add(alertKey)
+				// Limpiar alertas procesadas después de 5 minutos
+				setTimeout(() => processedAlertsRef.current.delete(alertKey), 5 * 60 * 1000)
+				
+				console.log('🚨 [NotificationPanel] Evento new_alerta recibido:', alertaData)
+				const payload = {
+					type: 'alerta',
+					event: 'alert_created',
+					title: `${eventData.type_display || eventData.type || 'Alerta'} - ${eventData.cruce_nombre || `Cruce #${eventData.cruce}`}`,
+					message: eventData.description || 'Sin descripción',
+					severity: eventData.severity || 'INFO',
+					timestamp: eventData.created_at || new Date().toISOString(),
+					metadata: {
+						alerta_id: eventData.id,
+						cruce_nombre: eventData.cruce_nombre,
+						cruce_id: eventData.cruce,
+					},
+					data: eventData,
+				}
+				handleSocketNotification(payload)
+			}
+
+			// ✅ CORRECCIÓN: Registrar listeners solo una vez, removiendo previos si existen
+			socket.off('notification', handleNotificationDirect) // Remover previo si existe
+			socket.off('new_alerta', handleNewAlertaDirect) // Remover previo si existe
+			socket.off('alerta', handleNewAlertaDirect) // Remover previo si existe
+			
+			socket.on('notification', handleNotificationDirect)
+			socket.on('new_alerta', handleNewAlertaDirect)
+			socket.on('alerta', handleNewAlertaDirect) // También escuchar 'alerta' por compatibilidad
+
+			console.log('✅ [NotificationPanel] Listeners configurados correctamente')
+
+			return () => {
+				console.log('🧹 [NotificationPanel] Limpiando listeners')
+				socket.off('notification', handleNotificationDirect)
+				socket.off('new_alerta', handleNewAlertaDirect)
+				socket.off('alerta', handleNewAlertaDirect)
+			}
+		}
+
+		const cleanup = setupDirectListeners()
+		return cleanup
+	}, [handleSocketNotification])
 
 	const handleRefreshAlerts = () => {
 		loadAlerts()
 	}
 
 	const handleMarkAsRead = (item) => {
+		const readIds = getReadNotifications()
+		if (!readIds.includes(item.rawId)) {
+			readIds.push(item.rawId)
+			saveReadNotifications(readIds)
+		}
+
 		if (item.origin === 'rest') {
 			setAlerts(prev => prev.map(alert => alert.id === item.rawId ? { ...alert, read: true } : alert))
 		} else {
