@@ -442,10 +442,6 @@ export function NotificationPanel() {
 		return cleanup
 	}, [handleSocketNotification])
 
-	const handleRefreshAlerts = () => {
-		loadAlerts()
-	}
-
 	const handleMarkAsRead = (item) => {
 		const readIds = getReadNotifications()
 		if (!readIds.includes(item.rawId)) {
