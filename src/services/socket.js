@@ -213,19 +213,24 @@ export const socketEvents = {
 	
 	// Escuchar alertas resueltas (estructura: { type: 'alerta_resuelta', data: {...}, timestamp: '...' })
 	// ✅ CORRECCIÓN: Guardar referencia del handler wrapper
+	// También escucha 'alerta_resuelta' para compatibilidad con el backend
 	onAlertaResolved: (callback) => {
 		if (socket) {
 			const key = 'alerta_resolved';
 			const prevHandler = handlerRefs.get(key);
 			if (prevHandler) {
 				socket.off(key, prevHandler);
+				socket.off('alerta_resuelta', prevHandler); // También limpiar versión alternativa
 			}
 			const handler = (eventData) => {
+				debugLog('✅ [Socket.IO] Evento alerta_resolved recibido:', eventData);
 				const alertaData = eventData.data || eventData;
 				callback(alertaData);
 			};
 			handlerRefs.set(key, handler);
 			socket.on(key, handler);
+			// También escuchar versión alternativa 'alerta_resuelta' para compatibilidad
+			socket.on('alerta_resuelta', handler);
 		}
 	},
 	

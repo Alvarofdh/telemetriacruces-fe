@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useData } from '../hooks/useData'
 import { useMetaTags } from '../hooks/useMetaTags'
-import { getSocket } from '../services/socket'
+import { getSocket, socketEvents } from '../services/socket'
 import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import ResponsableInfo from './contacto/ResponsableInfo'
 import { useSensores } from '../hooks/useSensores'
-import { combineSensoresWithTelemetria, getSensorStatusColor } from '../utils/telemetriaHelpers'
+import { combineSensoresWithTelemetria, getSensorStatusColor, normalizeCruceData } from '../utils/telemetriaHelpers'
 import { getBarrierEvents } from '../services/barrierEvents'
 import { getHistorialMantenimiento } from '../services/mantenimiento'
 
@@ -259,7 +259,7 @@ export function CruceDetail() {
 		cargarDatosCruce()
 	}, [id, cruces])
 	
-	// ✅ CORRECCIÓN CRÍTICA: Suscribirse cuando socket se conecta (incluso si el componente ya estaba montado)
+	// ✅ CORRECCIÓN CRÍTICA: Suscribirse a todos los eventos de Socket.IO para actualización en tiempo real
 	useEffect(() => {
 		if (!socket || !id) {
 			return
@@ -277,32 +277,128 @@ export function CruceDetail() {
 			console.log(`📡 [CruceDetail] Configurando listeners para cruce ${cruceId}`)
 			
 			// ✅ CRÍTICO: Suscribirse a eventos Y unirse a la sala
-			console.log(`📡 [CruceDetail] Suscribiéndose a eventos: ${cruceRoom}`)
-			socket.emit('subscribe', { events: [cruceRoom] })
+			console.log(`📡 [CruceDetail] Suscribiéndose a eventos: ${cruceRoom}, telemetria, barrier_events`)
+			socketEvents.subscribe([cruceRoom, 'telemetria', 'barrier_events', 'alertas'])
 			
 			// ✅ CRÍTICO: Unirse a la sala de Socket.IO (para que el backend vea al cliente)
 			console.log(`🚪 [CruceDetail] Uniéndose a sala de Socket.IO: ${cruceRoom}`)
-			socket.emit('join_room', { room: cruceRoom })
+			socketEvents.joinCruceRoom(cruceId)
 		}
 		
 		// Listener para actualización de cruce
-		const handleCruceUpdate = (data) => {
-			console.log('🔄 [CruceDetail] Evento cruce_update recibido:', data)
-			const cruceInfo = data.data || data
+		const handleCruceUpdate = (cruceInfo) => {
+			console.log('🔄 [CruceDetail] Evento cruce_update recibido:', cruceInfo)
 			
 			// Verificar si es el cruce actual
 			if (cruceInfo && (cruceInfo.id === cruceId || cruceInfo.id_cruce === cruceId)) {
 				console.log(`✅ [CruceDetail] Actualizando cruce ${cruceId} en tiempo real`)
 				
+				// Normalizar datos del cruce usando el helper
+				const cruceNormalizado = normalizeCruceData(cruceInfo)
+				
 				// Actualizar el estado del cruce manteniendo los datos extra
 				setCruce(prevCruce => ({
 					...prevCruce,
-					...cruceInfo,
+					...cruceNormalizado,
 					// Mantener los datos históricos si existen
 					historicoTrafico: prevCruce?.historicoTrafico || [],
 					sensores: prevCruce?.sensores || [],
 					configuracion: prevCruce?.configuracion || {}
 				}))
+			}
+		}
+		
+		// Listener para nueva telemetría
+		const handleNewTelemetria = (telemetriaData) => {
+			console.log('📊 [CruceDetail] Nueva telemetría recibida:', telemetriaData)
+			const telemetria = telemetriaData.data || telemetriaData
+			
+			// Verificar si es del cruce actual
+			if (telemetria && (telemetria.cruce === cruceId || telemetria.cruce_id === cruceId)) {
+				console.log(`✅ [CruceDetail] Actualizando telemetría del cruce ${cruceId}`)
+				
+				// Actualizar el cruce con la nueva telemetría
+				setCruce(prevCruce => {
+					if (!prevCruce) return prevCruce
+					
+					// Crear objeto de telemetría actual
+					const telemetriaActual = {
+						...telemetria,
+						timestamp: telemetria.timestamp || new Date().toISOString()
+					}
+					
+					// Normalizar con la nueva telemetría
+					const cruceConTelemetria = {
+						...prevCruce,
+						telemetria_actual: telemetriaActual
+					}
+					
+					return normalizeCruceData(cruceConTelemetria)
+				})
+			}
+		}
+		
+		// Listener para eventos de barrera
+		const handleBarrierEvent = (barrierData) => {
+			console.log('🚧 [CruceDetail] Evento de barrera recibido:', barrierData)
+			const evento = barrierData.data || barrierData
+			
+			// Verificar si es del cruce actual
+			if (evento && (evento.cruce === cruceId || evento.cruce_id === cruceId || evento.id_cruce === cruceId)) {
+				console.log(`✅ [CruceDetail] Actualizando evento de barrera del cruce ${cruceId}`)
+				
+				// Actualizar estado de barrera en el cruce
+				setCruce(prevCruce => {
+					if (!prevCruce) return prevCruce
+					return {
+						...prevCruce,
+						barrier_status: evento.state || evento.barrier_status,
+						barrier_state: evento.state || evento.barrier_status,
+						ultimaActividad: evento.event_time || evento.timestamp || new Date().toISOString()
+					}
+				})
+				
+				// ✅ CORRECCIÓN: Siempre recargar eventos de tráfico cuando se recibe un evento de barrera
+				// Esto asegura que la tabla se actualice automáticamente
+				const recargarEventos = async () => {
+					try {
+						console.log(`🔄 [CruceDetail] Recargando eventos de tráfico para cruce ${cruceId}`)
+						const eventosResponse = await getBarrierEvents({
+							cruce: cruceId,
+							page: 1,
+							page_size: 50
+						})
+						const eventos = eventosResponse.results || eventosResponse || []
+						setEventosTrafico(eventos)
+						
+						// Recalcular estadísticas
+						const ahora = new Date()
+						const inicioDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate())
+						const inicioSemana = new Date(ahora)
+						inicioSemana.setDate(ahora.getDate() - ahora.getDay())
+						inicioSemana.setHours(0, 0, 0, 0)
+						
+						const eventosHoy = eventos.filter(e => {
+							const fechaEvento = new Date(e.event_time || e.timestamp)
+							return fechaEvento >= inicioDia
+						})
+						
+						const eventosSemana = eventos.filter(e => {
+							const fechaEvento = new Date(e.event_time || e.timestamp)
+							return fechaEvento >= inicioSemana
+						})
+						
+						setEstadisticasTrafico({
+							total: eventos.length,
+							hoy: eventosHoy.length,
+							estaSemana: eventosSemana.length
+						})
+						console.log(`✅ [CruceDetail] Eventos de tráfico recargados: ${eventos.length} eventos`)
+					} catch (error) {
+						console.error('❌ [CruceDetail] Error al recargar eventos de tráfico:', error)
+					}
+				}
+				recargarEventos()
 			}
 		}
 		
@@ -317,25 +413,31 @@ export function CruceDetail() {
 			setupSocketListeners()
 		}
 		
-		// Registrar listeners
-		socket.on('connect', handleConnect)
-		socket.on('connected', handleConnect) // Evento personalizado del backend
-		socket.on('cruce_update', handleCruceUpdate)
+		// Registrar listeners usando socketEvents para mejor gestión
+		// Guardar referencias para poder removerlos correctamente
+		socketEvents.onConnected(handleConnect)
+		socketEvents.onCruceUpdate(handleCruceUpdate)
+		socketEvents.onNewTelemetria(handleNewTelemetria)
+		socketEvents.onBarrierEvent(handleBarrierEvent)
 		
 		console.log(`✅ [CruceDetail] Listeners registrados para cruce ${cruceId}`)
 		
 		// Cleanup: remover listeners al desmontar o cambiar de cruce
+		// NOTA: socketEvents.onX ya maneja la limpieza de handlers previos, pero
+		// removemos explícitamente para asegurar limpieza completa
 		return () => {
 			console.log(`🧹 [CruceDetail] Limpiando listeners para cruce ${cruceId}`)
-			socket.off('connect', handleConnect)
-			socket.off('connected', handleConnect)
-			socket.off('cruce_update', handleCruceUpdate)
+			// Remover listeners pasando los mismos callbacks
+			socketEvents.off('connected', handleConnect)
+			socketEvents.off('cruce_update', handleCruceUpdate)
+			socketEvents.off('new_telemetria', handleNewTelemetria)
+			socketEvents.off('barrier_event', handleBarrierEvent)
 			if (socket.connected) {
-				socket.emit('unsubscribe', { events: [cruceRoom] })
-				socket.emit('leave_room', { room: cruceRoom })
+				socketEvents.unsubscribe([cruceRoom, 'telemetria', 'barrier_events', 'alertas'])
+				socketEvents.leaveCruceRoom(cruceId)
 			}
 		}
-	}, [socket, id])
+	}, [socket, id, activeTab])
 
 	// Actualizar meta tags dinámicamente
 	useMetaTags({

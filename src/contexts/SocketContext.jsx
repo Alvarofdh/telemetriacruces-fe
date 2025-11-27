@@ -274,16 +274,19 @@ export function SocketProvider({ children }) {
 
 		// Cleanup
 		return () => {
-			socketEvents.removeAllListeners('connected')
-			socketEvents.removeAllListeners('subscribed')
-			socketEvents.removeAllListeners('joined_room')
-			socketEvents.removeAllListeners('notification')
-			socketEvents.removeAllListeners('dashboard_update')
-			socketEvents.removeAllListeners('cruce_update')
-			socketEvents.removeAllListeners('new_telemetria')
-			socketEvents.removeAllListeners('new_alerta')
-			socketEvents.removeAllListeners('alerta_resolved')
-			socketEvents.removeAllListeners('barrier_event')
+			debugLog('🧹 [SocketContext] Limpiando listeners')
+			// ✅ CORRECCIÓN: Usar off() con las referencias correctas en lugar de removeAllListeners
+			// Esto evita afectar otros componentes que también usan estos eventos
+			socketEvents.off('connected', handleConnected)
+			socketEvents.off('subscribed', handleSubscribed)
+			socketEvents.off('joined_room', handleJoinedRoom)
+			socketEvents.off('notification', handleNotification)
+			socketEvents.off('dashboard_update', handleDashboardUpdate)
+			socketEvents.off('cruce_update', handleCruceUpdate)
+			socketEvents.off('new_telemetria', handleTelemetriaUpdated)
+			socketEvents.off('new_alerta', handleNewAlerta)
+			socketEvents.off('alerta_resolved', handleAlertaResolved)
+			socketEvents.off('barrier_event', handleBarrierEvent)
 		}
 	}, [user, updateCruceInState, upsertCruceInState, checkAuth])
 

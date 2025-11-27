@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { useData } from '../../hooks/useData'
 import { createAlerta } from '../../services/alertas'
-import { getSocket } from '../../services/socket'
+import { createTelemetria } from '../../services/telemetria'
+import { createBarrierEvent } from '../../services/barrierEvents'
+import { patchCruce } from '../../services/cruces'
 import toast from 'react-hot-toast'
 
 // Iconos SVG para simulaciones
@@ -138,15 +140,32 @@ export function SimulatorPanel() {
 			color: 'blue',
 			category: 'tren',
 			action: async (cruce) => {
-				const updatedCruce = {
-					...cruce,
-					ultimaActividad: new Date().toISOString(),
-					tipoTren: ['Carga', 'Pasajeros', 'Mixto'][Math.floor(Math.random() * 3)],
-					velocidadPromedio: Math.floor(Math.random() * 40) + 30,
-					sensoresActivos: Math.min(cruce.sensoresActivos + 1, 4)
+				try {
+					const tipoTren = ['Carga', 'Pasajeros', 'Mixto'][Math.floor(Math.random() * 3)]
+					const velocidad = Math.floor(Math.random() * 40) + 30
+					
+					// Crear telemetría del paso del tren
+					await createTelemetria({
+						cruce: cruce.id_cruce || cruce.id,
+						barrier_voltage: 12.0 + Math.random() * 2,
+						battery_voltage: cruce.bateria ? (cruce.bateria / 100 * 5 + 10) : 12.0,
+						barrier_status: 'DOWN', // Barrera baja cuando pasa el tren
+						sensor_1: 1023, // Sensores activados
+						sensor_2: 1023,
+						sensor_3: 1023,
+						sensor_4: 1023,
+						signal_strength: Math.floor(-70 + Math.random() * 10), // Integer según API
+						temperature: 20 + Math.random() * 10,
+					})
+					
+					// No actualizar cruce - estos datos no existen en el modelo del backend
+					// La telemetría ya se creó y actualizará los datos automáticamente
+					
+					return `Tren ${tipoTren} pasó por ${cruce.nombre} a ${velocidad} km/h`
+				} catch (error) {
+					console.error('Error simulando paso de tren:', error)
+					return `Error al simular paso de tren en ${cruce.nombre}`
 				}
-				await actualizarCruce(cruce.id_cruce, updatedCruce)
-				return `Tren ${updatedCruce.tipoTren} pasó por ${cruce.nombre} a ${updatedCruce.velocidadPromedio} km/h`
 			}
 		},
 		{
@@ -157,15 +176,31 @@ export function SimulatorPanel() {
 			color: 'blue',
 			category: 'tren',
 			action: async (cruce) => {
-				const updatedCruce = {
-					...cruce,
-					ultimaActividad: new Date().toISOString(),
-					tipoTren: 'Pasajeros',
-					velocidadPromedio: Math.floor(Math.random() * 30) + 80,
-					sensoresActivos: 4
+				try {
+					const velocidad = Math.floor(Math.random() * 30) + 80
+					
+					// Crear telemetría del tren de alta velocidad
+					await createTelemetria({
+						cruce: cruce.id_cruce || cruce.id,
+						barrier_voltage: 12.0 + Math.random() * 2,
+						battery_voltage: cruce.bateria ? (cruce.bateria / 100 * 5 + 10) : 12.0,
+						barrier_status: 'DOWN', // Barrera baja
+						sensor_1: 1023, // Todos los sensores activados
+						sensor_2: 1023,
+						sensor_3: 1023,
+						sensor_4: 1023,
+						signal_strength: Math.floor(-70 + Math.random() * 10), // Integer según API
+						temperature: 20 + Math.random() * 10,
+					})
+					
+					// No actualizar cruce - estos datos no existen en el modelo del backend
+					// La telemetría ya se creó y actualizará los datos automáticamente
+					
+					return `Tren de alta velocidad pasó por ${cruce.nombre} a ${velocidad} km/h`
+				} catch (error) {
+					console.error('Error simulando tren de alta velocidad:', error)
+					return `Error al simular tren de alta velocidad en ${cruce.nombre}`
 				}
-				await actualizarCruce(cruce.id_cruce, updatedCruce)
-				return `Tren de alta velocidad pasó por ${cruce.nombre} a ${updatedCruce.velocidadPromedio} km/h`
 			}
 		},
 		{
@@ -177,8 +212,9 @@ export function SimulatorPanel() {
 			category: 'tren',
 			action: async (cruce) => {
 				try {
+					// Usar SENSOR_ERROR como tipo válido (TRAIN_DETECTED no existe en el backend)
 					await createAlerta({
-						type: 'TRAIN_DETECTED',
+						type: 'SENSOR_ERROR',
 						severity: 'INFO',
 						description: `Tren detectado acercándose a ${cruce.nombre}`,
 						cruce: cruce.id_cruce || cruce.id
@@ -200,14 +236,37 @@ export function SimulatorPanel() {
 			color: 'yellow',
 			category: 'bateria',
 			action: async (cruce) => {
-				const newBateria = Math.max(0, cruce.bateria - (Math.floor(Math.random() * 30) + 10))
-				const updatedCruce = {
-					...cruce,
-					bateria: newBateria,
-					estado: newBateria < 20 ? 'INACTIVO' : cruce.estado
+				try {
+					const newBateria = Math.max(0, cruce.bateria - (Math.floor(Math.random() * 30) + 10))
+					const batteryVoltage = (newBateria / 100 * 5 + 10) // Convertir porcentaje a voltaje (10-15V)
+					
+					// Crear telemetría con batería baja
+					await createTelemetria({
+						cruce: cruce.id_cruce || cruce.id,
+						barrier_voltage: 12.0 + Math.random() * 2,
+						battery_voltage: batteryVoltage,
+						barrier_status: cruce.estado === 'ACTIVO' ? 'UP' : 'DOWN',
+						sensor_1: Math.floor(Math.random() * 1024),
+						sensor_2: Math.floor(Math.random() * 1024),
+						sensor_3: Math.floor(Math.random() * 1024),
+						sensor_4: Math.floor(Math.random() * 1024),
+						signal_strength: Math.floor(-70 + Math.random() * 10), // Integer según API
+						temperature: 20 + Math.random() * 10,
+					})
+					
+					// Actualizar cruce (solo estado, la batería se actualiza con la telemetría)
+					// Usar patchCruce para actualización parcial (PUT requiere todos los campos)
+					if (newBateria < 20 && cruce.estado !== 'INACTIVO') {
+						await patchCruce(cruce.id_cruce, {
+							estado: 'INACTIVO'
+						})
+					}
+					
+					return `Batería de ${cruce.nombre} descendió a ${newBateria}%`
+				} catch (error) {
+					console.error('Error simulando batería baja:', error)
+					return `Error al simular batería baja en ${cruce.nombre}`
 				}
-				await actualizarCruce(cruce.id_cruce, updatedCruce)
-				return `Batería de ${cruce.nombre} descendió a ${newBateria}%`
 			}
 		},
 		{
@@ -218,24 +277,49 @@ export function SimulatorPanel() {
 			color: 'red',
 			category: 'bateria',
 			action: async (cruce) => {
-				const newBateria = Math.floor(Math.random() * 20)
-				const updatedCruce = {
-					...cruce,
-					bateria: newBateria,
-					estado: 'INACTIVO'
-				}
-				await actualizarCruce(cruce.id_cruce, updatedCruce)
 				try {
-					await createAlerta({
-						type: 'LOW_BATTERY',
-						severity: 'CRITICAL',
-						description: `Batería crítica en ${cruce.nombre}: ${newBateria}%`,
-						cruce: cruce.id_cruce || cruce.id
+					const newBateria = Math.floor(Math.random() * 20)
+					const batteryVoltage = (newBateria / 100 * 5 + 10) // Convertir porcentaje a voltaje
+					
+					// Crear telemetría con batería crítica
+					await createTelemetria({
+						cruce: cruce.id_cruce || cruce.id,
+						barrier_voltage: 12.0 + Math.random() * 2,
+						battery_voltage: batteryVoltage,
+						barrier_status: 'DOWN',
+						sensor_1: Math.floor(Math.random() * 1024),
+						sensor_2: Math.floor(Math.random() * 1024),
+						sensor_3: Math.floor(Math.random() * 1024),
+						sensor_4: Math.floor(Math.random() * 1024),
+						signal_strength: Math.floor(-70 + Math.random() * 10), // Integer según API
+						temperature: 20 + Math.random() * 10,
 					})
+					
+					// Actualizar cruce (solo estado, la batería se actualiza con la telemetría)
+					// Usar patchCruce para actualización parcial (PUT requiere todos los campos)
+					if (cruce.estado !== 'INACTIVO') {
+						await patchCruce(cruce.id_cruce, {
+							estado: 'INACTIVO'
+						})
+					}
+					
+					// Crear alerta
+					try {
+						await createAlerta({
+							type: 'LOW_BATTERY',
+							severity: 'CRITICAL',
+							description: `Batería crítica en ${cruce.nombre}: ${newBateria}%`,
+							cruce: cruce.id_cruce || cruce.id
+						})
+					} catch (error) {
+						console.error('Error creando alerta:', error)
+					}
+					
+					return `BATERÍA CRÍTICA: ${cruce.nombre} tiene ${newBateria}%`
 				} catch (error) {
-					console.error('Error creando alerta:', error)
+					console.error('Error simulando batería crítica:', error)
+					return `Error al simular batería crítica en ${cruce.nombre}`
 				}
-				return `BATERÍA CRÍTICA: ${cruce.nombre} tiene ${newBateria}%`
 			}
 		},
 		{
@@ -246,14 +330,37 @@ export function SimulatorPanel() {
 			color: 'green',
 			category: 'bateria',
 			action: async (cruce) => {
-				const newBateria = Math.min(100, cruce.bateria + (Math.floor(Math.random() * 30) + 20))
-				const updatedCruce = {
-					...cruce,
-					bateria: newBateria,
-					estado: newBateria > 50 ? 'ACTIVO' : cruce.estado
+				try {
+					const newBateria = Math.min(100, cruce.bateria + (Math.floor(Math.random() * 30) + 20))
+					const batteryVoltage = (newBateria / 100 * 5 + 10) // Convertir porcentaje a voltaje
+					
+					// Crear telemetría con batería cargando
+					await createTelemetria({
+						cruce: cruce.id_cruce || cruce.id,
+						barrier_voltage: 12.0 + Math.random() * 2,
+						battery_voltage: batteryVoltage,
+						barrier_status: 'UP',
+						sensor_1: Math.floor(Math.random() * 1024),
+						sensor_2: Math.floor(Math.random() * 1024),
+						sensor_3: Math.floor(Math.random() * 1024),
+						sensor_4: Math.floor(Math.random() * 1024),
+						signal_strength: Math.floor(-70 + Math.random() * 10), // Integer según API
+						temperature: 20 + Math.random() * 10,
+					})
+					
+					// Actualizar cruce (solo estado si es necesario, la batería se actualiza con la telemetría)
+					// Usar patchCruce para actualización parcial (PUT requiere todos los campos)
+					if (newBateria > 50 && cruce.estado !== 'ACTIVO') {
+						await patchCruce(cruce.id_cruce, {
+							estado: 'ACTIVO'
+						})
+					}
+					
+					return `Batería de ${cruce.nombre} cargada a ${newBateria}%`
+				} catch (error) {
+					console.error('Error simulando carga de batería:', error)
+					return `Error al simular carga de batería en ${cruce.nombre}`
 				}
-				await actualizarCruce(cruce.id_cruce, updatedCruce)
-				return `Batería de ${cruce.nombre} cargada a ${newBateria}%`
 			}
 		},
 		
@@ -267,12 +374,13 @@ export function SimulatorPanel() {
 			category: 'sensores',
 			action: async (cruce) => {
 				const newSensores = Math.max(0, cruce.sensoresActivos - (Math.floor(Math.random() * 2) + 1))
-				const updatedCruce = {
-					...cruce,
-					sensoresActivos: newSensores,
-					estado: newSensores < 2 ? 'MANTENIMIENTO' : cruce.estado
+				// Actualizar solo estado si es necesario (sensoresActivos no existe en el backend)
+				// Usar patchCruce para actualización parcial (PUT requiere todos los campos)
+				if (newSensores < 2 && cruce.estado !== 'MANTENIMIENTO') {
+					await patchCruce(cruce.id_cruce, {
+						estado: 'MANTENIMIENTO'
+					})
 				}
-				await actualizarCruce(cruce.id_cruce, updatedCruce)
 				try {
 					await createAlerta({
 						type: 'SENSOR_ERROR',
@@ -295,12 +403,13 @@ export function SimulatorPanel() {
 			category: 'sensores',
 			action: async (cruce) => {
 				const newSensores = Math.min(4, cruce.sensoresActivos + (Math.floor(Math.random() * 2) + 1))
-				const updatedCruce = {
-					...cruce,
-					sensoresActivos: newSensores,
-					estado: newSensores >= 3 ? 'ACTIVO' : cruce.estado
+				// Actualizar solo estado si es necesario (sensoresActivos no existe en el backend)
+				// Usar patchCruce para actualización parcial (PUT requiere todos los campos)
+				if (newSensores >= 3 && cruce.estado !== 'ACTIVO') {
+					await patchCruce(cruce.id_cruce, {
+						estado: 'ACTIVO'
+					})
 				}
-				await actualizarCruce(cruce.id_cruce, updatedCruce)
 				return `Sensores de ${cruce.nombre} recuperados: ${newSensores}/4 activos`
 			}
 		},
@@ -312,12 +421,13 @@ export function SimulatorPanel() {
 			color: 'red',
 			category: 'sensores',
 			action: async (cruce) => {
-				const updatedCruce = {
-					...cruce,
-					sensoresActivos: 0,
-					estado: 'INACTIVO'
+				// Actualizar solo estado (sensoresActivos no existe en el backend)
+				// Usar patchCruce para actualización parcial (PUT requiere todos los campos)
+				if (cruce.estado !== 'INACTIVO') {
+					await patchCruce(cruce.id_cruce, {
+						estado: 'INACTIVO'
+					})
 				}
-				await actualizarCruce(cruce.id_cruce, updatedCruce)
 				try {
 					await createAlerta({
 						type: 'SENSOR_ERROR',
@@ -341,15 +451,37 @@ export function SimulatorPanel() {
 			color: 'blue',
 			category: 'barrera',
 			action: async (cruce) => {
-				const socket = getSocket()
-				if (socket && socket.connected) {
-					socket.emit('barrier_event', {
+				try {
+					// Crear telemetría con barrera bajada
+					const telemetria = await createTelemetria({
 						cruce: cruce.id_cruce || cruce.id,
+						barrier_voltage: 12.0 + Math.random() * 2,
+						battery_voltage: cruce.bateria ? (cruce.bateria / 100 * 5 + 10) : 12.0,
 						barrier_status: 'DOWN',
-						timestamp: new Date().toISOString()
+						sensor_1: Math.floor(Math.random() * 1024),
+						sensor_2: Math.floor(Math.random() * 1024),
+						sensor_3: Math.floor(Math.random() * 1024),
+						sensor_4: Math.floor(Math.random() * 1024),
+						signal_strength: Math.floor(-70 + Math.random() * 10), // Integer según API
+						temperature: 20 + Math.random() * 10,
 					})
+					
+					// Crear evento de barrera en el backend
+					// ✅ El backend emite automáticamente el evento 'barrier_event' vía signal
+					// No es necesario emitirlo manualmente desde el frontend
+					await createBarrierEvent({
+						cruce: cruce.id_cruce || cruce.id,
+						state: 'DOWN',
+						event_time: new Date().toISOString(),
+						voltage_at_event: 12.0 + Math.random() * 2,
+						telemetria: telemetria.id,
+					})
+					
+					return `Barrera de ${cruce.nombre} bajada correctamente`
+				} catch (error) {
+					console.error('Error simulando barrera baja:', error)
+					return `Error al simular barrera baja en ${cruce.nombre}`
 				}
-				return `Barrera de ${cruce.nombre} bajada`
 			}
 		},
 		{
@@ -360,15 +492,37 @@ export function SimulatorPanel() {
 			color: 'green',
 			category: 'barrera',
 			action: async (cruce) => {
-				const socket = getSocket()
-				if (socket && socket.connected) {
-					socket.emit('barrier_event', {
+				try {
+					// Crear telemetría con barrera subida
+					const telemetria = await createTelemetria({
 						cruce: cruce.id_cruce || cruce.id,
+						barrier_voltage: 12.0 + Math.random() * 2,
+						battery_voltage: cruce.bateria ? (cruce.bateria / 100 * 5 + 10) : 12.0,
 						barrier_status: 'UP',
-						timestamp: new Date().toISOString()
+						sensor_1: Math.floor(Math.random() * 1024),
+						sensor_2: Math.floor(Math.random() * 1024),
+						sensor_3: Math.floor(Math.random() * 1024),
+						sensor_4: Math.floor(Math.random() * 1024),
+						signal_strength: Math.floor(-70 + Math.random() * 10), // Integer según API
+						temperature: 20 + Math.random() * 10,
 					})
+					
+					// Crear evento de barrera en el backend
+					// ✅ El backend emite automáticamente el evento 'barrier_event' vía signal
+					// No es necesario emitirlo manualmente desde el frontend
+					await createBarrierEvent({
+						cruce: cruce.id_cruce || cruce.id,
+						state: 'UP',
+						event_time: new Date().toISOString(),
+						voltage_at_event: 12.0 + Math.random() * 2,
+						telemetria: telemetria.id,
+					})
+					
+					return `Barrera de ${cruce.nombre} subida correctamente`
+				} catch (error) {
+					console.error('Error simulando barrera subida:', error)
+					return `Error al simular barrera subida en ${cruce.nombre}`
 				}
-				return `Barrera de ${cruce.nombre} subida`
 			}
 		},
 		{
@@ -380,8 +534,9 @@ export function SimulatorPanel() {
 			category: 'barrera',
 			action: async (cruce) => {
 				try {
+					// Usar BARRIER_STUCK como tipo válido (BARRIER_ERROR no existe en el backend)
 					await createAlerta({
-						type: 'BARRIER_ERROR',
+						type: 'BARRIER_STUCK',
 						severity: 'CRITICAL',
 						description: `Error en el mecanismo de barrera de ${cruce.nombre}`,
 						cruce: cruce.id_cruce || cruce.id
@@ -403,15 +558,17 @@ export function SimulatorPanel() {
 			color: 'red',
 			category: 'comunicacion',
 			action: async (cruce) => {
-				const updatedCruce = {
-					...cruce,
-					estado: 'INACTIVO',
-					ultimaActividad: new Date(Date.now() - 3600000).toISOString() // 1 hora atrás
+				// Actualizar solo estado (ultimaActividad no existe en el backend)
+				// Usar patchCruce para actualización parcial (PUT requiere todos los campos)
+				if (cruce.estado !== 'INACTIVO') {
+					await patchCruce(cruce.id_cruce, {
+						estado: 'INACTIVO'
+					})
 				}
-				await actualizarCruce(cruce.id_cruce, updatedCruce)
 				try {
+					// Usar COMMUNICATION_LOST como tipo válido (COMMUNICATION_ERROR no existe en el backend)
 					await createAlerta({
-						type: 'COMMUNICATION_ERROR',
+						type: 'COMMUNICATION_LOST',
 						severity: 'CRITICAL',
 						description: `Pérdida de comunicación con ${cruce.nombre}`,
 						cruce: cruce.id_cruce || cruce.id
@@ -430,12 +587,14 @@ export function SimulatorPanel() {
 			color: 'green',
 			category: 'comunicacion',
 			action: async (cruce) => {
-				const updatedCruce = {
-					...cruce,
-					estado: cruce.bateria > 20 ? 'ACTIVO' : 'MANTENIMIENTO',
-					ultimaActividad: new Date().toISOString()
+				// Actualizar solo estado (ultimaActividad no existe en el backend)
+				// Usar patchCruce para actualización parcial (PUT requiere todos los campos)
+				const nuevoEstado = cruce.bateria > 20 ? 'ACTIVO' : 'MANTENIMIENTO'
+				if (cruce.estado !== nuevoEstado) {
+					await patchCruce(cruce.id_cruce, {
+						estado: nuevoEstado
+					})
 				}
-				await actualizarCruce(cruce.id_cruce, updatedCruce)
 				return `Comunicación restaurada con ${cruce.nombre}`
 			}
 		},
@@ -450,8 +609,9 @@ export function SimulatorPanel() {
 			category: 'temperatura',
 			action: async (cruce) => {
 				try {
+					// Usar SENSOR_ERROR como tipo válido (OTHER no existe en el backend)
 					await createAlerta({
-						type: 'OTHER',
+						type: 'SENSOR_ERROR',
 						severity: 'WARNING',
 						description: `Temperatura alta detectada en ${cruce.nombre}: ${Math.floor(Math.random() * 10) + 40}°C`,
 						cruce: cruce.id_cruce || cruce.id
@@ -485,8 +645,9 @@ export function SimulatorPanel() {
 			category: 'gabinete',
 			action: async (cruce) => {
 				try {
+					// Usar GABINETE_ABIERTO como tipo válido (OTHER no existe en el backend)
 					await createAlerta({
-						type: 'OTHER',
+						type: 'GABINETE_ABIERTO',
 						severity: 'WARNING',
 						description: `Gabinete abierto en ${cruce.nombre}`,
 						cruce: cruce.id_cruce || cruce.id
@@ -508,16 +669,17 @@ export function SimulatorPanel() {
 			color: 'red',
 			category: 'estado',
 			action: async (cruce) => {
-				const updatedCruce = {
-					...cruce,
-					estado: 'INACTIVO',
-					sensoresActivos: 0,
-					bateria: Math.max(0, cruce.bateria - 5)
+				// Actualizar solo estado (otros campos no existen en el backend)
+				// Usar patchCruce para actualización parcial (PUT requiere todos los campos)
+				if (cruce.estado !== 'INACTIVO') {
+					await patchCruce(cruce.id_cruce, {
+						estado: 'INACTIVO'
+					})
 				}
-				await actualizarCruce(cruce.id_cruce, updatedCruce)
 				try {
+					// Usar SENSOR_ERROR como tipo válido (OTHER no existe en el backend)
 					await createAlerta({
-						type: 'OTHER',
+						type: 'SENSOR_ERROR',
 						severity: 'CRITICAL',
 						description: `${cruce.nombre} está INACTIVO - Requiere intervención inmediata`,
 						cruce: cruce.id_cruce || cruce.id
@@ -536,12 +698,13 @@ export function SimulatorPanel() {
 			color: 'yellow',
 			category: 'estado',
 			action: async (cruce) => {
-				const updatedCruce = {
-					...cruce,
-					estado: 'MANTENIMIENTO',
-					bateria: Math.min(100, cruce.bateria + 10)
+				// Actualizar solo estado (bateria no existe en el backend)
+				// Usar patchCruce para actualización parcial (PUT requiere todos los campos)
+				if (cruce.estado !== 'MANTENIMIENTO') {
+					await patchCruce(cruce.id_cruce, {
+						estado: 'MANTENIMIENTO'
+					})
 				}
-				await actualizarCruce(cruce.id_cruce, updatedCruce)
 				return `${cruce.nombre} está en MANTENIMIENTO`
 			}
 		},
@@ -553,13 +716,13 @@ export function SimulatorPanel() {
 			color: 'green',
 			category: 'estado',
 			action: async (cruce) => {
-				const updatedCruce = {
-					...cruce,
-					estado: 'ACTIVO',
-					bateria: Math.min(100, cruce.bateria + 20),
-					sensoresActivos: Math.min(4, cruce.sensoresActivos + 2)
+				// Actualizar solo estado (otros campos no existen en el backend)
+				// Usar patchCruce para actualización parcial (PUT requiere todos los campos)
+				if (cruce.estado !== 'ACTIVO') {
+					await patchCruce(cruce.id_cruce, {
+						estado: 'ACTIVO'
+					})
 				}
-				await actualizarCruce(cruce.id_cruce, updatedCruce)
 				return `${cruce.nombre} se recuperó y está ACTIVO`
 			}
 		},
@@ -571,14 +734,13 @@ export function SimulatorPanel() {
 			color: 'green',
 			category: 'estado',
 			action: async (cruce) => {
-				const updatedCruce = {
-					...cruce,
-					estado: 'ACTIVO',
-					bateria: Math.min(100, cruce.bateria + 30),
-					sensoresActivos: 4,
-					ultimaActividad: new Date().toISOString()
+				// Actualizar solo estado (otros campos no existen en el backend)
+				// Usar patchCruce para actualización parcial (PUT requiere todos los campos)
+				if (cruce.estado !== 'ACTIVO') {
+					await patchCruce(cruce.id_cruce, {
+						estado: 'ACTIVO'
+					})
 				}
-				await actualizarCruce(cruce.id_cruce, updatedCruce)
 				return `${cruce.nombre} activado completamente`
 			}
 		},
@@ -592,16 +754,17 @@ export function SimulatorPanel() {
 			color: 'red',
 			category: 'emergencia',
 			action: async (cruce) => {
-				const updatedCruce = {
-					...cruce,
-					estado: 'INACTIVO',
-					sensoresActivos: 0,
-					bateria: cruce.bateria
+				// Actualizar solo estado (otros campos no existen en el backend)
+				// Usar patchCruce para actualización parcial (PUT requiere todos los campos)
+				if (cruce.estado !== 'INACTIVO') {
+					await patchCruce(cruce.id_cruce, {
+						estado: 'INACTIVO'
+					})
 				}
-				await actualizarCruce(cruce.id_cruce, updatedCruce)
 				try {
+					// Usar VOLTAGE_CRITICAL como tipo válido (OTHER no existe en el backend)
 					await createAlerta({
-						type: 'OTHER',
+						type: 'VOLTAGE_CRITICAL',
 						severity: 'CRITICAL',
 						description: `APAGADO DE EMERGENCIA en ${cruce.nombre}`,
 						cruce: cruce.id_cruce || cruce.id
@@ -620,16 +783,17 @@ export function SimulatorPanel() {
 			color: 'red',
 			category: 'emergencia',
 			action: async (cruce) => {
-				const updatedCruce = {
-					...cruce,
-					estado: 'INACTIVO',
-					sensoresActivos: Math.max(0, cruce.sensoresActivos - 2),
-					bateria: Math.max(0, cruce.bateria - 20)
+				// Actualizar solo estado (otros campos no existen en el backend)
+				// Usar patchCruce para actualización parcial (PUT requiere todos los campos)
+				if (cruce.estado !== 'INACTIVO') {
+					await patchCruce(cruce.id_cruce, {
+						estado: 'INACTIVO'
+					})
 				}
-				await actualizarCruce(cruce.id_cruce, updatedCruce)
 				try {
+					// Usar SENSOR_ERROR como tipo válido (OTHER no existe en el backend)
 					await createAlerta({
-						type: 'OTHER',
+						type: 'SENSOR_ERROR',
 						severity: 'CRITICAL',
 						description: `Múltiples fallas detectadas en ${cruce.nombre}`,
 						cruce: cruce.id_cruce || cruce.id
@@ -650,16 +814,24 @@ export function SimulatorPanel() {
 			color: 'blue',
 			category: 'telemetria',
 			action: async (cruce) => {
-				const socket = getSocket()
-				if (socket && socket.connected) {
-					socket.emit('new_telemetria', {
+				try {
+					const telemetria = await createTelemetria({
 						cruce: cruce.id_cruce || cruce.id,
-						barrier_voltage: (Math.random() * 2 + 12).toFixed(2),
-						battery_voltage: (Math.random() * 5 + 10).toFixed(2),
-						timestamp: new Date().toISOString()
+						barrier_voltage: 12.0 + Math.random() * 2,
+						battery_voltage: cruce.bateria ? (cruce.bateria / 100 * 5 + 10) : 12.0,
+						barrier_status: Math.random() > 0.5 ? 'UP' : 'DOWN',
+						sensor_1: Math.floor(Math.random() * 1024),
+						sensor_2: Math.floor(Math.random() * 1024),
+						sensor_3: Math.floor(Math.random() * 1024),
+						sensor_4: Math.floor(Math.random() * 1024),
+						signal_strength: Math.floor(-70 + Math.random() * 10), // Integer según API
+						temperature: 20 + Math.random() * 10,
 					})
+					return `Telemetría actualizada para ${cruce.nombre} (ID: ${telemetria.id})`
+				} catch (error) {
+					console.error('Error creando telemetría:', error)
+					return `Error al actualizar telemetría de ${cruce.nombre}`
 				}
-				return `Telemetría actualizada para ${cruce.nombre}`
 			}
 		},
 		{
@@ -670,16 +842,24 @@ export function SimulatorPanel() {
 			color: 'yellow',
 			category: 'telemetria',
 			action: async (cruce) => {
-				const socket = getSocket()
-				if (socket && socket.connected) {
-					socket.emit('new_telemetria', {
+				try {
+					const telemetria = await createTelemetria({
 						cruce: cruce.id_cruce || cruce.id,
-						barrier_voltage: (Math.random() * 2 + 8).toFixed(2), // Voltaje bajo
-						battery_voltage: (Math.random() * 3 + 9).toFixed(2),
-						timestamp: new Date().toISOString()
+						barrier_voltage: 8.0 + Math.random() * 2, // Voltaje bajo
+						battery_voltage: 9.0 + Math.random() * 3, // Batería baja también
+						barrier_status: 'DOWN',
+						sensor_1: Math.floor(Math.random() * 1024),
+						sensor_2: Math.floor(Math.random() * 1024),
+						sensor_3: Math.floor(Math.random() * 1024),
+						sensor_4: Math.floor(Math.random() * 1024),
+						signal_strength: Math.floor(-85 + Math.random() * 5), // Señal débil (Integer según API)
+						temperature: 25 + Math.random() * 5,
 					})
+					return `Caída de voltaje detectada en ${cruce.nombre} (ID: ${telemetria.id})`
+				} catch (error) {
+					console.error('Error creando telemetría de voltaje bajo:', error)
+					return `Error al simular caída de voltaje en ${cruce.nombre}`
 				}
-				return `Caída de voltaje detectada en ${cruce.nombre}`
 			}
 		}
 	]

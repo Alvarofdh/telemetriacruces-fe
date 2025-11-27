@@ -16,7 +16,7 @@ const DEFAULT_SETTINGS = {
 	notify_gabinete_open: true,
 }
 
-const MAX_ITEMS = 30
+const MAX_ITEMS = 1000 // Aumentado para cargar todas las alertas
 const VISIBLE_ITEMS = 3
 const READ_NOTIFICATIONS_KEY = 'read_notifications'
 
@@ -167,9 +167,33 @@ export function NotificationPanel() {
 	const loadAlerts = useCallback(async () => {
 		setIsLoadingAlerts(true)
 		try {
-			const response = await getAlertas({ resolved: false, page_size: MAX_ITEMS })
+			// ✅ CORRECCIÓN: Cargar todas las alertas no resueltas con paginación
+			let allAlerts = []
+			let page = 1
+			let hasMore = true
+			const pageSize = 100 // Tamaño de página para cada request
+			
+			// Cargar todas las páginas de alertas no resueltas
+			while (hasMore && allAlerts.length < MAX_ITEMS) {
+				const response = await getAlertas({ 
+					resolved: false, 
+					page: page,
+					page_size: pageSize 
+				})
+				
+				const alerts = response?.results || []
+				if (alerts.length === 0) {
+					hasMore = false
+				} else {
+					allAlerts = [...allAlerts, ...alerts]
+					// Si hay más páginas (next existe), continuar
+					hasMore = !!response?.next && alerts.length === pageSize
+					page++
+				}
+			}
+			
 			const readIds = getReadNotifications()
-			const lista = (response?.results || response || []).map(alert => {
+			const lista = allAlerts.map(alert => {
 				const normalized = normalizeAlert(alert)
 				// ✅ CORRECCIÓN: Verificar si ya fue leída desde localStorage
 				return {
@@ -177,8 +201,11 @@ export function NotificationPanel() {
 					read: normalized.read || readIds.includes(alert.id)
 				}
 			})
+			
+			console.log(`✅ [NotificationPanel] Cargadas ${lista.length} alertas no resueltas`)
 			setAlerts(lista)
 		} catch (error) {
+			console.error('❌ [NotificationPanel] Error al cargar alertas:', error)
 			toast.error(error.message || 'No se pudieron cargar las alertas')
 		} finally {
 			setIsLoadingAlerts(false)
@@ -338,6 +365,7 @@ export function NotificationPanel() {
 			})
 
 			return () => {
+				console.log('🧹 [NotificationPanel] Limpiando listeners de conexión')
 				socket.off('connect', handleConnected)
 				socket.off('connected', handleConnected)
 				socket.off('joined_room')
@@ -345,6 +373,7 @@ export function NotificationPanel() {
 				if (socket.connected) {
 					socket.emit('leave_room', { room: 'notifications' })
 					socket.emit('leave_room', { room: 'alertas' })
+					socket.emit('unsubscribe', { events: ['alertas', 'notifications'] })
 				}
 			}
 		}
@@ -484,6 +513,36 @@ export function NotificationPanel() {
 		return [...realtimeItems, ...restItems].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
 	}, [alerts, realtimeNotifications])
 
+	// ✅ NUEVA FUNCIÓN: Marcar todas las notificaciones como leídas
+	// Movida después de combinedAlerts para evitar error de inicialización
+	const handleMarkAllAsRead = useCallback(() => {
+		const readIds = getReadNotifications()
+		
+		// Obtener todos los IDs no leídos directamente de alerts y realtimeNotifications
+		const unreadAlertsIds = alerts
+			.filter(alert => !alert.read)
+			.map(alert => alert.id)
+		
+		const unreadRealtimeIds = realtimeNotifications
+			.filter(alert => !alert.read)
+			.map(alert => alert.id)
+		
+		const allUnreadIds = [...unreadAlertsIds, ...unreadRealtimeIds]
+		
+		// Agregar todos los IDs no leídos a la lista de leídos
+		const newReadIds = [...new Set([...readIds, ...allUnreadIds])]
+		saveReadNotifications(newReadIds)
+
+		// Actualizar estado de todas las alertas
+		setAlerts(prev => prev.map(alert => ({ ...alert, read: true })))
+		setRealtimeNotifications(prev => prev.map(alert => ({ ...alert, read: true })))
+
+		toast.success(`Se marcaron ${allUnreadIds.length} notificaciones como leídas`, {
+			icon: '✓',
+			duration: 2000
+		})
+	}, [alerts, realtimeNotifications, getReadNotifications, saveReadNotifications])
+
 	const alertasAMostrar = mostrarTodas ? combinedAlerts : combinedAlerts.slice(0, VISIBLE_ITEMS)
 
 	const getAlertaStyles = (severity) => {
@@ -509,11 +568,20 @@ export function NotificationPanel() {
 							<div className="flex items-center justify-between gap-2 mt-0.5">
 								<p className="text-xs sm:text-sm text-gray-800 dark:text-gray-300 truncate font-medium">Notificaciones del sistema</p>
 								{totalUnread > 0 && (
-									<div className="flex items-center space-x-1 flex-shrink-0">
-										<span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-											{totalUnread > 99 ? '99+' : totalUnread}
-					</span>
-										<span className="text-xs text-gray-800 dark:text-gray-300 hidden sm:inline font-medium">sin leer</span>
+									<div className="flex items-center space-x-2 flex-shrink-0">
+										<div className="flex items-center space-x-1">
+											<span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+												{totalUnread > 99 ? '99+' : totalUnread}
+											</span>
+											<span className="text-xs text-gray-800 dark:text-gray-300 hidden sm:inline font-medium">sin leer</span>
+										</div>
+										<button
+											onClick={handleMarkAllAsRead}
+											className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors px-2 py-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20"
+											title="Marcar todas como leídas"
+										>
+											Marcar todas
+										</button>
 									</div>
 								)}
 							</div>

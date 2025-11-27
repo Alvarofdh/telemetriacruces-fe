@@ -1,5 +1,7 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { useData } from '../hooks/useData'
+import { useAlertas } from '../hooks/useAlertas'
+import { connectSocket, socketEvents } from '../services/socket'
 import toast from 'react-hot-toast'
 
 // Componentes de iconos profesionales
@@ -79,141 +81,128 @@ export function AlertSystem() {
 	const [filterType, setFilterType] = useState('ALL')
 	const [searchTerm, setSearchTerm] = useState('')
 	const [sortBy, setSortBy] = useState('priority') // priority, timestamp, cruce
-
-	// Definir reglas de alertas
-	const alertRules = useMemo(() => [
-		{
-			id: 'battery_critical',
-			type: 'CRITICAL',
-			priority: 1,
-			condition: (cruce) => cruce.bateria < 20,
-			message: (cruce) => `Batería crítica en ${cruce.nombre}: ${cruce.bateria}%`,
-			action: 'Revisar inmediatamente',
-			icon: 'battery',
-			color: 'red'
-		},
-		{
-			id: 'battery_low',
-			type: 'WARNING',
-			priority: 2,
-			condition: (cruce) => cruce.bateria >= 20 && cruce.bateria < 50,
-			message: (cruce) => `Batería baja en ${cruce.nombre}: ${cruce.bateria}%`,
-			action: 'Programar mantenimiento',
-			icon: 'warning',
-			color: 'yellow'
-		},
-		{
-			id: 'temperature_high',
-			type: 'WARNING',
-			priority: 2,
-			condition: (cruce) => cruce.temperature && cruce.temperature > 45,
-			message: (cruce) => `Temperatura alta en ${cruce.nombre}: ${cruce.temperature?.toFixed(1)}°C`,
-			action: 'Monitorear temperatura',
-			icon: 'temperature',
-			color: 'orange'
-		},
-		{
-			id: 'temperature_critical',
-			type: 'CRITICAL',
-			priority: 1,
-			condition: (cruce) => cruce.temperature && cruce.temperature > 55,
-			message: (cruce) => `Temperatura crítica en ${cruce.nombre}: ${cruce.temperature?.toFixed(1)}°C`,
-			action: 'Apagar sistema inmediatamente',
-			icon: 'fire',
-			color: 'red'
-		},
-		{
-			id: 'faults_detected',
-			type: 'WARNING',
-			priority: 2,
-			condition: (cruce) => cruce.faults && cruce.faults > 0,
-			message: (cruce) => `Fallas detectadas en ${cruce.nombre} (Código: ${cruce.faults})`,
-			action: 'Revisar logs del sistema',
-			icon: 'cog',
-			color: 'red'
-		},
-		{
-			id: 'barrier_fault',
-			type: 'CRITICAL',
-			priority: 1,
-			condition: (cruce) => cruce.barrier_state === 'FAULT',
-			message: (cruce) => `Falla en barrera de ${cruce.nombre}`,
-			action: 'Intervención inmediata requerida',
-			icon: 'barrier',
-			color: 'red'
-		},
-		{
-			id: 'sensors_offline',
-			type: 'WARNING',
-			priority: 2,
-			condition: (cruce) => cruce.sensoresActivos < 2,
-			message: (cruce) => {
-				const totalSensores = cruce.totalSensores || cruce.total_sensores || cruce.sensores?.length || 0
-				return `Sensores limitados en ${cruce.nombre}: ${cruce.sensoresActivos}/${totalSensores} activos`
-			},
-			action: 'Revisar sensores',
-			icon: 'sensor',
-			color: 'orange'
-		},
-		{
-			id: 'wifi_weak',
-			type: 'INFO',
-			priority: 3,
-			condition: (cruce) => cruce.rssi && cruce.rssi < -80,
-			message: (cruce) => `Señal WiFi débil en ${cruce.nombre}: ${cruce.rssi} dBm`,
-			action: 'Verificar conectividad',
-			icon: 'wifi',
-			color: 'yellow'
-		},
-		{
-			id: 'inactive_status',
-			type: 'CRITICAL',
-			priority: 1,
-			condition: (cruce) => cruce.estado === 'INACTIVO',
-			message: (cruce) => `${cruce.nombre} está INACTIVO`,
-			action: 'Restablecer operación',
-			icon: 'xCircle',
-			color: 'red'
-		},
-		{
-			id: 'maintenance_needed',
-			type: 'INFO',
-			priority: 3,
-			condition: (cruce) => cruce.estado === 'MANTENIMIENTO',
-			message: (cruce) => `${cruce.nombre} en mantenimiento`,
-			action: 'Completar mantenimiento',
-			icon: 'wrench',
-			color: 'blue'
+	
+	// ✅ CONECTAR AL BACKEND: Obtener alertas reales del backend
+	const { alertas: alertasBackend, loading: loadingAlertas, refetch: refetchAlertas, resolveAlerta } = useAlertas({
+		resolved: false, // Solo alertas no resueltas
+		page_size: 100 // Obtener todas las alertas activas
+	})
+	
+	// Mapear tipos de alerta del backend a iconos
+	const getAlertIcon = (type) => {
+		const iconMap = {
+			'LOW_BATTERY': 'battery',
+			'SENSOR_ERROR': 'sensor',
+			'BARRIER_STUCK': 'barrier',
+			'VOLTAGE_CRITICAL': 'warning',
+			'COMMUNICATION_LOST': 'wifi',
+			'GABINETE_ABIERTO': 'warning',
 		}
-	], [])
-
-	// Generar alertas activas
+		return iconMap[type] || 'warning'
+	}
+	
+	// Obtener cruce por ID para las alertas del backend
+	const getCruceById = (cruceId) => {
+		return cruces.find(c => c.id_cruce === cruceId || c.id === cruceId) || { nombre: `Cruce #${cruceId}`, ubicacion: 'N/A' }
+	}
+	
+	// Función para obtener acción recomendada según tipo de alerta
+	const getActionForAlertType = (type) => {
+		const actionMap = {
+			'LOW_BATTERY': 'Revisar batería inmediatamente',
+			'SENSOR_ERROR': 'Verificar sensores y conexiones',
+			'BARRIER_STUCK': 'Revisar mecánicamente la barrera',
+			'VOLTAGE_CRITICAL': 'Verificar suministro eléctrico',
+			'COMMUNICATION_LOST': 'Verificar conectividad WiFi',
+			'GABINETE_ABIERTO': 'Verificar seguridad física del cruce',
+		}
+		return actionMap[type] || 'Revisar el sistema'
+	}
+	
+	// Transformar alertas del backend al formato esperado
 	const activeAlerts = useMemo(() => {
-		const alerts = []
-		
-		cruces.forEach(cruce => {
-			alertRules.forEach(rule => {
-				if (rule.condition(cruce)) {
-					alerts.push({
-						...rule,
-						cruce: cruce,
-						timestamp: new Date()
-					})
-				}
-			})
+		const alertasTransformadas = alertasBackend.map(alerta => {
+			const cruce = getCruceById(alerta.cruce)
+			return {
+				id: alerta.id,
+				type: alerta.severity || 'INFO',
+				priority: alerta.severity === 'CRITICAL' ? 1 : alerta.severity === 'WARNING' ? 2 : 3,
+				message: () => alerta.description,
+				action: getActionForAlertType(alerta.type),
+				icon: getAlertIcon(alerta.type),
+				cruce: cruce,
+				timestamp: new Date(alerta.created_at),
+				alertaBackend: alerta, // Guardar referencia a la alerta original
+			}
 		})
-
+		
 		// Ordenar según criterio seleccionado
 		if (sortBy === 'priority') {
-			alerts.sort((a, b) => a.priority - b.priority)
+			alertasTransformadas.sort((a, b) => a.priority - b.priority)
 		} else if (sortBy === 'timestamp') {
-			alerts.sort((a, b) => b.timestamp - a.timestamp)
+			alertasTransformadas.sort((a, b) => b.timestamp - a.timestamp)
 		} else if (sortBy === 'cruce') {
-			alerts.sort((a, b) => a.cruce.nombre.localeCompare(b.cruce.nombre))
+			alertasTransformadas.sort((a, b) => a.cruce.nombre.localeCompare(b.cruce.nombre))
 		}
-
-		return alerts
-	}, [cruces, alertRules, sortBy])
+		
+		return alertasTransformadas
+	}, [alertasBackend, cruces, sortBy])
+	
+	// ✅ CONECTAR SOCKET.IO: Escuchar nuevas alertas en tiempo real
+	useEffect(() => {
+		const socket = connectSocket()
+		if (!socket) return
+		
+		const handleNewAlerta = (alertaData) => {
+			console.log('🔔 [AlertSystem] Nueva alerta recibida:', alertaData)
+			// Refrescar alertas cuando se recibe una nueva
+			refetchAlertas()
+		}
+		
+		const handleAlertaResolved = (alertaData) => {
+			console.log('✅ [AlertSystem] Alerta resuelta:', alertaData)
+			// Refrescar alertas cuando se resuelve una
+			refetchAlertas()
+		}
+		
+		// Función para unirse a salas cuando el socket se conecte
+		const joinRooms = () => {
+			if (socket.connected) {
+				console.log('🔔 [AlertSystem] Uniéndose a sala de alertas')
+				socket.emit('join_room', { room: 'alertas' })
+				socket.emit('subscribe', { events: ['alertas'] })
+			}
+		}
+		
+		// Suscribirse a eventos de alertas
+		socketEvents.onNewAlerta(handleNewAlerta)
+		socketEvents.onAlertaResolved(handleAlertaResolved)
+		
+		// Unirse a sala de alertas si ya está conectado
+		if (socket.connected) {
+			joinRooms()
+		}
+		
+		// También unirse cuando se conecte/autentique
+		const handleConnect = () => {
+			console.log('✅ [AlertSystem] Socket conectado, uniéndose a salas')
+			joinRooms()
+		}
+		
+		socket.on('connect', handleConnect)
+		socket.on('connected', handleConnect) // Evento de autenticación
+		
+		return () => {
+			console.log('🧹 [AlertSystem] Limpiando listeners')
+			socketEvents.off('new_alerta', handleNewAlerta)
+			socketEvents.off('alerta_resolved', handleAlertaResolved)
+			socket.off('connect', handleConnect)
+			socket.off('connected', handleConnect)
+			if (socket.connected) {
+				socket.emit('leave_room', { room: 'alertas' })
+			}
+		}
+	}, [refetchAlertas])
 
 	// Filtrar alertas
 	const filteredAlerts = useMemo(() => {
@@ -227,11 +216,12 @@ export function AlertSystem() {
 		// Filtrar por búsqueda
 		if (searchTerm) {
 			const term = searchTerm.toLowerCase()
-			filtered = filtered.filter(alert => 
-				alert.cruce.nombre.toLowerCase().includes(term) ||
-				alert.cruce.ubicacion.toLowerCase().includes(term) ||
-				alert.message(alert.cruce).toLowerCase().includes(term)
-			)
+			filtered = filtered.filter(alert => {
+				const message = typeof alert.message === 'function' ? alert.message(alert.cruce) : alert.message
+				return alert.cruce.nombre.toLowerCase().includes(term) ||
+					alert.cruce.ubicacion.toLowerCase().includes(term) ||
+					message.toLowerCase().includes(term)
+			})
 		}
 
 		return filtered
@@ -304,15 +294,27 @@ export function AlertSystem() {
 					</div>
 					{activeAlerts.length > 0 && (
 						<button
-							onClick={() => {
-								toast.success('Todas las alertas han sido reconocidas', {
-									icon: '✅',
-									duration: 3000
-								})
+							onClick={async () => {
+								try {
+									// Resolver todas las alertas
+									await Promise.all(
+										activeAlerts.map(alert => 
+											resolveAlerta(alert.id)
+										)
+									)
+									toast.success('Todas las alertas han sido reconocidas', {
+										icon: '✅',
+										duration: 3000
+									})
+									refetchAlertas()
+								} catch (error) {
+									toast.error('Error al reconocer alertas')
+								}
 							}}
 							className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors shadow-md"
+							disabled={loadingAlertas}
 						>
-							✓ Reconocer Todas
+							{loadingAlertas ? 'Procesando...' : '✓ Reconocer Todas'}
 						</button>
 					)}
 				</div>
@@ -448,7 +450,12 @@ export function AlertSystem() {
 
 			{/* Lista de alertas mejorada */}
 			<div className="space-y-4">
-				{filteredAlerts.length === 0 ? (
+				{loadingAlertas ? (
+					<div className="bg-white dark:bg-gray-800 rounded-xl p-12 text-center shadow-md border border-gray-200 dark:border-gray-700">
+						<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+						<p className="text-gray-600 dark:text-gray-400">Cargando alertas...</p>
+					</div>
+				) : filteredAlerts.length === 0 ? (
 					<div className="bg-white dark:bg-gray-800 rounded-xl p-12 text-center shadow-md border border-gray-200 dark:border-gray-700">
 						<div className="w-20 h-20 bg-green-100 dark:bg-green-900 rounded-xl flex items-center justify-center mx-auto mb-4">
 							{AlertIcons.checkCircle("w-12 h-12 text-green-600 dark:text-green-400")}
@@ -495,7 +502,7 @@ export function AlertSystem() {
 
 									{/* Mensaje */}
 									<h3 className={`font-semibold text-base lg:text-lg mb-2 ${getAlertTextColor(alert.type)}`}>
-										{alert.message(alert.cruce)}
+										{typeof alert.message === 'function' ? alert.message(alert.cruce) : alert.message}
 									</h3>
 
 									{/* Acción */}
@@ -531,15 +538,22 @@ export function AlertSystem() {
 
 								{/* Botón de acción */}
 								<button
-									onClick={() => {
-										toast.success(`Alerta reconocida: ${alert.cruce.nombre}`, {
-											icon: '✅',
-											duration: 3000
-										})
+									onClick={async () => {
+										try {
+											await resolveAlerta(alert.id)
+											toast.success(`Alerta reconocida: ${alert.cruce.nombre}`, {
+												icon: '✅',
+												duration: 3000
+											})
+											refetchAlertas()
+										} catch (error) {
+											toast.error('Error al reconocer alerta')
+										}
 									}}
-									className="px-4 py-2.5 text-sm font-medium bg-gray-50 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-600 shrink-0 w-full lg:w-auto"
+									className="px-4 py-2.5 text-sm font-medium bg-gray-50 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-600 shrink-0 w-full lg:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+									disabled={loadingAlertas}
 								>
-									Reconocer
+									{loadingAlertas ? 'Procesando...' : 'Reconocer'}
 								</button>
 							</div>
 						</div>
