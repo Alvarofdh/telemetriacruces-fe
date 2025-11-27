@@ -19,8 +19,12 @@ export const getBarrierEvents = async (params = {}) => {
 	if (params.page_size) {
 		queryParams.append('page_size', params.page_size)
 	}
+	// ✅ CORRECCIÓN: El backend espera 'cruce_id' según views.py
 	if (params.cruce) {
-		queryParams.append('cruce', params.cruce)
+		queryParams.append('cruce_id', params.cruce)
+	}
+	if (params.cruce_id) {
+		queryParams.append('cruce_id', params.cruce_id)
 	}
 	if (params.state) {
 		queryParams.append('state', params.state)
@@ -30,7 +34,8 @@ export const getBarrierEvents = async (params = {}) => {
 	}
 	
 	const queryString = queryParams.toString()
-	const endpoint = `/api/barrier-events/${queryString ? `?${queryString}` : ''}`
+	// ✅ CORRECCIÓN: Construir URL correctamente
+	const endpoint = queryString ? `/api/barrier-events/?${queryString}` : '/api/barrier-events/'
 	
 	return await http.get(endpoint)
 }

@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useData } from '../hooks/useData'
 import toast from 'react-hot-toast'
 import jsPDF from 'jspdf'
-import 'jspdf-autotable'
+import autoTable from 'jspdf-autotable'
 
 export function ExportData() {
 	const { cruces, stats, logs } = useData()
@@ -110,7 +110,7 @@ export function ExportData() {
 			['Total de Sensores', stats.sensoresTotal.toString()]
 		]
 
-		doc.autoTable({
+		autoTable(doc, {
 			startY: yPos,
 			head: [['Métrica', 'Valor']],
 			body: statsData,
@@ -119,7 +119,7 @@ export function ExportData() {
 			margin: { left: 20, right: 20 }
 		})
 
-		yPos = doc.lastAutoTable.finalY + 15
+		yPos = (doc.lastAutoTable?.finalY || yPos + 50) + 15
 
 		// Sección de Cruces
 		if (yPos > 250) {
@@ -135,12 +135,12 @@ export function ExportData() {
 			cruce.nombre,
 			cruce.estado,
 			`${cruce.bateria}%`,
-			`${cruce.sensoresActivos}/4`,
+			`${cruce.sensoresActivos || 0}/${cruce.totalSensores || cruce.total_sensores || cruce.sensores?.length || 0}`,
 			cruce.ubicacion,
 			getContactoResumen(cruce)
 		])
 
-		doc.autoTable({
+		autoTable(doc, {
 			startY: yPos + 5,
 			head: [['Nombre', 'Estado', 'Batería', 'Sensores', 'Ubicación', 'Contacto']],
 			body: crucesData,
@@ -158,7 +158,7 @@ export function ExportData() {
 			}
 		})
 
-		yPos = doc.lastAutoTable.finalY + 15
+		yPos = (doc.lastAutoTable?.finalY || yPos + 50) + 15
 
 		// Sección de Alertas
 		const alertas = cruces.filter(c => 
@@ -180,7 +180,8 @@ export function ExportData() {
 				const problemas = []
 				if (cruce.bateria < 50) problemas.push(`Batería baja: ${cruce.bateria}%`)
 				if (cruce.estado !== 'ACTIVO') problemas.push(`Estado: ${cruce.estado}`)
-				if (cruce.sensoresActivos < 2) problemas.push(`Sensores limitados: ${cruce.sensoresActivos}/4`)
+				const totalSensores = cruce.totalSensores || cruce.total_sensores || cruce.sensores?.length || 0
+				if (cruce.sensoresActivos < 2) problemas.push(`Sensores limitados: ${cruce.sensoresActivos}/${totalSensores}`)
 				
 				return [
 					cruce.nombre,
@@ -188,7 +189,7 @@ export function ExportData() {
 				]
 			})
 
-			doc.autoTable({
+			autoTable(doc, {
 				startY: yPos + 5,
 				head: [['Cruce', 'Problemas Detectados']],
 				body: alertasData,

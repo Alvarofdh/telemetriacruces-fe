@@ -159,7 +159,7 @@ export function MapView() {
                             <div className="min-w-0">
                               <p className="text-[10px] text-gray-500 dark:text-gray-400">Sensores</p>
                               <p className="text-xs font-semibold text-purple-600 dark:text-purple-400">
-                                {cruce.sensoresActivos || 0}/4
+                                {cruce.sensoresActivos || 0}/{cruce.totalSensores || cruce.total_sensores || cruce.sensores?.length || 0}
                               </p>
                             </div>
                           </div>
@@ -259,7 +259,7 @@ export function MapView() {
                 </div>
                 <div className="flex justify-between">
                   <span>Sensores Activos:</span>
-                  <span className="font-semibold">{selectedCruce.sensoresActivos}/4</span>
+                  <span className="font-semibold">{selectedCruce.sensoresActivos || 0}/{selectedCruce.totalSensores || selectedCruce.total_sensores || selectedCruce.sensores?.length || 0}</span>
                 </div>
               </div>
             </div>

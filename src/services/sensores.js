@@ -19,8 +19,13 @@ export const getSensores = async (params = {}) => {
 	if (params.page_size) {
 		queryParams.append('page_size', params.page_size)
 	}
+	// ✅ CORRECCIÓN: El backend espera 'cruce_id', no 'cruce'
 	if (params.cruce) {
-		queryParams.append('cruce', params.cruce)
+		queryParams.append('cruce_id', params.cruce)
+	}
+	// También aceptar 'cruce_id' directamente por si acaso
+	if (params.cruce_id) {
+		queryParams.append('cruce_id', params.cruce_id)
 	}
 	if (params.tipo) {
 		queryParams.append('tipo', params.tipo)
@@ -30,7 +35,12 @@ export const getSensores = async (params = {}) => {
 	}
 	
 	const queryString = queryParams.toString()
-	const endpoint = `/api/sensores/${queryString ? `?${queryString}` : ''}`
+	// ✅ CORRECCIÓN: Construir URL correctamente
+	const endpoint = queryString ? `/api/sensores/?${queryString}` : '/api/sensores/'
+	
+	if (import.meta.env.DEV && params.cruce) {
+		console.log('🔍 [getSensores] Filtros:', { cruce: params.cruce, queryString, endpoint })
+	}
 	
 	return await http.get(endpoint)
 }

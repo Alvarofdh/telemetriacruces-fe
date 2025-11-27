@@ -187,7 +187,8 @@ export function CrossingList() {
                 nombre={cruce.nombre}
                 estado={cruce.estado}
                 bateria={cruce.bateria}
-                sensores={cruce.sensoresActivos}
+                sensores={cruce.sensoresActivos || 0}
+                totalSensores={cruce.totalSensores || cruce.total_sensores || cruce.sensores?.length || 0}
                 ubicacion={cruce.ubicacion}
                 ultimaActividad={cruce.ultimaActividad}
                 tipoTren={cruce.tipoTren}

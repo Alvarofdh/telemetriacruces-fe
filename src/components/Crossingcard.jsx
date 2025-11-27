@@ -7,6 +7,7 @@ function CrossingCardComponent({
 	estado, 
 	bateria, 
 	sensores, 
+	totalSensores,
 	ubicacion, 
 	ultimaActividad, 
 	tipoTren, 
@@ -187,15 +188,21 @@ function CrossingCardComponent({
 							<span className="text-xs font-medium text-gray-600 dark:text-gray-400">Sensores</span>
 						</div>
 						<p className="text-2xl font-bold text-gray-900 dark:text-white">
-							{sensores}<span className="text-lg text-gray-500 dark:text-gray-400">/4</span>
+							{totalSensores > 0 ? `${sensores}/${totalSensores}` : sensores}
 						</p>
 						<div className="mt-2 flex gap-1">
-							{[...Array(4)].map((_, i) => (
-								<div 
-									key={i} 
-									className={`flex-1 h-2 rounded-full ${i < sensores ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}
-								/>
-							))}
+							{[...Array(Math.max(totalSensores || 1, 1))].map((_, i) => {
+								// Mostrar activo si este sensor está activo
+								const activos = sensores || 0
+								const debeEstarActivo = i < activos
+								
+								return (
+									<div 
+										key={i} 
+										className={`flex-1 h-2 rounded-full transition-colors ${debeEstarActivo ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+									/>
+								)
+							})}
 						</div>
 					</div>
 				</div>
@@ -270,6 +277,7 @@ export const CrossingCard = memo(CrossingCardComponent, (prevProps, nextProps) =
 		prevProps.estado === nextProps.estado &&
 		prevProps.bateria === nextProps.bateria &&
 		prevProps.sensores === nextProps.sensores &&
+		prevProps.totalSensores === nextProps.totalSensores &&
 		prevProps.ultimaActividad === nextProps.ultimaActividad
 	)
 })

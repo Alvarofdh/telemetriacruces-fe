@@ -281,7 +281,7 @@ export function CruceManagement() {
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-gray-600 dark:text-white/70 uppercase tracking-[0.25em] mb-0.5">Sensores activos</p>
                       <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                        {cruce.sensoresActivos || 0} / 4 sensores
+                        {cruce.sensoresActivos || 0} / {cruce.totalSensores || cruce.total_sensores || cruce.sensores?.length || 0} sensores
                       </p>
                     </div>
                   </div>

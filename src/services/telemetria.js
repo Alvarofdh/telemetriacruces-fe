@@ -131,7 +131,7 @@ export const exportTelemetria = async (params = {}) => {
 	}
 	
 	const queryString = queryParams.toString()
-	const endpoint = `/api/telemetria/exportar/${queryString ? `?${queryString}` : ''}`
+	const endpoint = `/api/telemetria/exportar${queryString ? `?${queryString}` : ''}`
 	
 	return await http.get(endpoint, { responseType: 'blob' })
 }

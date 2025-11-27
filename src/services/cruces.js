@@ -96,7 +96,7 @@ export const getCrucesDashboard = async (params = {}) => {
 	}
 	
 	const queryString = queryParams.toString()
-	const endpoint = `/api/cruces/dashboard/${queryString ? `?${queryString}` : ''}`
+	const endpoint = `/api/cruces/dashboard${queryString ? `?${queryString}` : ''}`
 	
 	return await http.get(endpoint)
 }
@@ -114,7 +114,7 @@ export const getCrucesMapa = async (params = {}) => {
 	}
 	
 	const queryString = queryParams.toString()
-	const endpoint = `/api/cruces/mapa/${queryString ? `?${queryString}` : ''}`
+	const endpoint = `/api/cruces/mapa${queryString ? `?${queryString}` : ''}`
 	
 	return await http.get(endpoint)
 }
@@ -132,7 +132,7 @@ export const exportCruces = async (params = {}) => {
 	}
 	
 	const queryString = queryParams.toString()
-	const endpoint = `/api/cruces/exportar/${queryString ? `?${queryString}` : ''}`
+	const endpoint = `/api/cruces/exportar${queryString ? `?${queryString}` : ''}`
 	
 	return await http.get(endpoint, { responseType: 'blob' })
 }

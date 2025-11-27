@@ -58,17 +58,84 @@ const CruceForm = ({ cruceId, onSuccess, onCancel }) => {
 				.then((cruce) => {
 					const lat = cruce.coordenadas_lat || '';
 					const lng = cruce.coordenadas_lng || '';
+					
+					// ✅ CORRECCIÓN: Buscar datos de contacto en múltiples ubicaciones
+					// El backend devuelve responsable como objeto: {nombre, telefono, email, empresa, horario}
+					const contacto = cruce.contacto || {};
+					const responsable = cruce.responsable || {};
+					
+					// Debug temporal (solo en desarrollo)
+					if (import.meta.env.DEV) {
+						console.log('🔍 [CruceForm] Datos del cruce recibidos:', {
+							cruce: cruce,
+							contacto: contacto,
+							responsable: responsable,
+							responsable_nombre: cruce.responsable_nombre,
+							responsable_keys: responsable ? Object.keys(responsable) : []
+						});
+					}
+					
+					// Helper para extraer string de un valor (maneja objetos)
+					const extractString = (value) => {
+						if (!value) return '';
+						if (typeof value === 'string') return value;
+						if (typeof value === 'number') return String(value);
+						if (typeof value === 'object') {
+							// Si es un objeto, intentar extraer propiedades comunes
+							return value.nombre || value.name || value.responsable || value.telefono || value.email || value.empresa || value.horario || '';
+						}
+						return '';
+					};
+					
+					// Extraer datos del contacto de forma segura
+					const getContactoValue = (field) => {
+						// Prioridad 1: Campo directo en cruce (responsable_nombre, responsable_telefono, etc.)
+						const directField = cruce[`responsable_${field}`];
+						if (directField) {
+							const extracted = extractString(directField);
+							if (extracted) return extracted;
+						}
+						
+						// Prioridad 2: Campo en objeto responsable (estructura del backend)
+						if (responsable && typeof responsable === 'object' && !Array.isArray(responsable)) {
+							const responsableField = responsable[field];
+							if (responsableField) {
+								const extracted = extractString(responsableField);
+								if (extracted) return extracted;
+							}
+						}
+						
+						// Prioridad 3: Campo en objeto contacto
+						if (contacto && typeof contacto === 'object' && !Array.isArray(contacto)) {
+							const contactoField = contacto[field] || contacto[`responsable_${field}`];
+							if (contactoField) {
+								const extracted = extractString(contactoField);
+								if (extracted) return extracted;
+							}
+						}
+						
+						// Prioridad 4: Campo alternativo (responsable, telefono directamente en cruce como string)
+						if (field === 'nombre' && cruce.responsable && typeof cruce.responsable === 'string') {
+							return cruce.responsable;
+						}
+						if (field === 'telefono' && cruce.telefono && typeof cruce.telefono === 'string') {
+							return cruce.telefono;
+						}
+						
+						return '';
+					};
+					
 					setFormData({
 						nombre: cruce.nombre || '',
 						ubicacion: cruce.ubicacion || '',
 						coordenadas_lat: lat,
 						coordenadas_lng: lng,
 						estado: cruce.estado || 'ACTIVO',
-						responsable_nombre: cruce.responsable_nombre || '',
-						responsable_telefono: cruce.responsable_telefono || '',
-						responsable_email: cruce.responsable_email || '',
-						responsable_empresa: cruce.responsable_empresa || '',
-						responsable_horario: cruce.responsable_horario || '',
+						responsable_nombre: getContactoValue('nombre'),
+						responsable_telefono: getContactoValue('telefono'),
+						responsable_email: getContactoValue('email'),
+						responsable_empresa: getContactoValue('empresa'),
+						responsable_horario: getContactoValue('horario'),
 					});
 					// Establecer posición del marcador si hay coordenadas
 					if (lat && lng) {

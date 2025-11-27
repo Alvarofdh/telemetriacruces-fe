@@ -7,6 +7,10 @@ import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import ResponsableInfo from './contacto/ResponsableInfo'
+import { useSensores } from '../hooks/useSensores'
+import { combineSensoresWithTelemetria, getSensorStatusColor } from '../utils/telemetriaHelpers'
+import { getBarrierEvents } from '../services/barrierEvents'
+import { getHistorialMantenimiento } from '../services/mantenimiento'
 
 // Configurar icono personalizado para el marcador
 const createCustomIcon = (estado) => {
@@ -88,18 +92,171 @@ export function CruceDetail() {
 	const [cruce, setCruce] = useState(null)
 	const [activeTab, setActiveTab] = useState('general')
 	const socket = getSocket()
-
-	// Cargar datos iniciales del cruce
+	
+	// ✅ Cargar sensores del cruce
+	const cruceId = id ? parseInt(id) : null
+	const { sensores: sensoresData, loading: sensoresLoading, stats: sensoresStats } = useSensores(cruceId)
+	
+	// ✅ Cargar eventos de tráfico (eventos de barrera)
+	const [eventosTrafico, setEventosTrafico] = useState([])
+	const [loadingTrafico, setLoadingTrafico] = useState(false)
+	const [estadisticasTrafico, setEstadisticasTrafico] = useState({
+		total: 0,
+		hoy: 0,
+		estaSemana: 0
+	})
+	
+	// ✅ Cargar datos de mantenimiento
+	const [datosMantenimiento, setDatosMantenimiento] = useState({
+		ultimoMantenimiento: null,
+		proximoMantenimiento: null,
+		loading: false
+	})
+	
+	// Debug: verificar que el cruceId se está pasando correctamente
 	useEffect(() => {
-		const cruceData = cruces.find(c => c.id_cruce === parseInt(id))
-		if (cruceData) {
-			const datosExtra = datosHistoricos[parseInt(id)] || {
-				historicoTrafico: [],
-				sensores: [],
-				configuracion: {}
-			}
-			setCruce({ ...cruceData, ...datosExtra })
+		if (cruceId) {
+			console.log('🔍 [CruceDetail] Cargando sensores para cruce:', cruceId)
 		}
+	}, [cruceId])
+	
+	// Calcular total de sensores y activos basado en datos reales
+	const totalSensores = sensoresStats?.total || cruce?.totalSensores || cruce?.sensores?.length || sensoresData?.length || 0
+	const sensoresActivosCount = sensoresStats?.activos || cruce?.sensoresActivos || 0
+	
+	// Cargar datos de mantenimiento cuando cambie el cruce
+	useEffect(() => {
+		if (!cruceId) return
+		
+		const cargarDatosMantenimiento = async () => {
+			setDatosMantenimiento(prev => ({ ...prev, loading: true }))
+			try {
+				// Cargar historial de mantenimientos del cruce
+				const mantenimientosResponse = await getHistorialMantenimiento({
+					cruce: cruceId,
+					page: 1,
+					page_size: 100
+				})
+				
+				const mantenimientos = mantenimientosResponse.results || mantenimientosResponse || []
+				
+				// Obtener último mantenimiento completado
+				const ultimoCompletado = mantenimientos
+					.filter(m => m.estado === 'COMPLETADO' && m.fecha_fin)
+					.sort((a, b) => new Date(b.fecha_fin) - new Date(a.fecha_fin))[0]
+				
+				// Obtener próximo mantenimiento programado (pendiente o en proceso)
+				const proximoProgramado = mantenimientos
+					.filter(m => (m.estado === 'PENDIENTE' || m.estado === 'EN_PROCESO') && m.fecha_programada)
+					.sort((a, b) => new Date(a.fecha_programada) - new Date(b.fecha_programada))[0]
+				
+				setDatosMantenimiento({
+					ultimoMantenimiento: ultimoCompletado?.fecha_fin || ultimoCompletado?.fecha_programada || null,
+					proximoMantenimiento: proximoProgramado?.fecha_programada || null,
+					loading: false
+				})
+			} catch (error) {
+				console.error('Error al cargar datos de mantenimiento:', error)
+				setDatosMantenimiento(prev => ({ ...prev, loading: false }))
+			}
+		}
+		
+		cargarDatosMantenimiento()
+	}, [cruceId])
+	
+	// Cargar eventos de tráfico cuando se active la pestaña o cambie el cruce
+	useEffect(() => {
+		if (!cruceId || activeTab !== 'trafico') return
+		
+		const cargarEventosTrafico = async () => {
+			setLoadingTrafico(true)
+			try {
+				// Cargar eventos de barrera recientes (últimos 30 días)
+				const eventosResponse = await getBarrierEvents({
+					cruce: cruceId,
+					page: 1,
+					page_size: 50
+				})
+				
+				const eventos = eventosResponse.results || eventosResponse || []
+				setEventosTrafico(eventos)
+				
+				// Calcular estadísticas
+				const ahora = new Date()
+				const inicioDia = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate())
+				const inicioSemana = new Date(ahora)
+				inicioSemana.setDate(ahora.getDate() - ahora.getDay())
+				inicioSemana.setHours(0, 0, 0, 0)
+				
+				const eventosHoy = eventos.filter(e => {
+					const fechaEvento = new Date(e.event_time || e.timestamp)
+					return fechaEvento >= inicioDia
+				})
+				
+				const eventosSemana = eventos.filter(e => {
+					const fechaEvento = new Date(e.event_time || e.timestamp)
+					return fechaEvento >= inicioSemana
+				})
+				
+				setEstadisticasTrafico({
+					total: eventos.length,
+					hoy: eventosHoy.length,
+					estaSemana: eventosSemana.length
+				})
+			} catch (error) {
+				console.error('Error al cargar eventos de tráfico:', error)
+			} finally {
+				setLoadingTrafico(false)
+			}
+		}
+		
+		cargarEventosTrafico()
+	}, [cruceId, activeTab])
+
+	// Cargar datos iniciales del cruce y datos de mantenimiento
+	useEffect(() => {
+		const cargarDatosCruce = async () => {
+			const cruceData = cruces.find(c => c.id_cruce === parseInt(id))
+			if (cruceData) {
+				try {
+					// Cargar datos completos del cruce desde el backend
+					const { getCruce } = await import('../services/cruces')
+					const cruceCompleto = await getCruce(parseInt(id))
+					
+					// Extraer datos de mantenimiento del backend
+					// El backend puede enviar estos datos en el endpoint de cruce
+					const fechaInstalacion = cruceCompleto.created_at || cruceData.created_at
+					
+					// Si el backend envía historial_mantenimientos, usarlo
+					// Si no, usar datos de ejemplo como fallback
+					const datosExtra = datosHistoricos[parseInt(id)] || {
+						historicoTrafico: [],
+						sensores: [],
+						configuracion: {}
+					}
+					
+					setCruce({ 
+						...cruceData, 
+						...cruceCompleto,
+						// Usar created_at como fecha de instalación
+						fechaInstalacion: fechaInstalacion || cruceData.fechaInstalacion,
+						// Mantener datos extra si no vienen del backend
+						...datosExtra
+					})
+				} catch (error) {
+					console.error('Error al cargar datos completos del cruce:', error)
+					// Fallback a datos básicos
+					const datosExtra = datosHistoricos[parseInt(id)] || {
+						historicoTrafico: [],
+						sensores: [],
+						configuracion: {}
+					}
+					setCruce({ ...cruceData, ...datosExtra })
+				}
+			}
+		}
+		
+		cargarDatosCruce()
 	}, [id, cruces])
 	
 	// ✅ CORRECCIÓN CRÍTICA: Suscribirse cuando socket se conecta (incluso si el componente ya estaba montado)
@@ -226,19 +383,57 @@ export function CruceDetail() {
 		})
 	}
 
+	// Iconos SVG para estados de barrera y otros elementos
+	const BarrierStateIcons = {
+		UP: (className = "w-5 h-5") => (
+			<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+			</svg>
+		),
+		DOWN: (className = "w-5 h-5") => (
+			<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+			</svg>
+		),
+		MOVING: (className = "w-5 h-5") => (
+			<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+			</svg>
+		),
+		FAULT: (className = "w-5 h-5") => (
+			<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" />
+			</svg>
+		)
+	}
+	
+	// Iconos adicionales
+	const UtilityIcons = {
+		sun: (className = "w-4 h-4") => (
+			<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+			</svg>
+		),
+		wifi: (className = "w-4 h-4") => (
+			<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+			</svg>
+		),
+		check: (className = "w-4 h-4") => (
+			<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+			</svg>
+		),
+		cross: (className = "w-4 h-4") => (
+			<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+			</svg>
+		)
+	}
+	
 	const getBarrierStateIcon = (state) => {
-		switch (state) {
-			case 'UP':
-				return '⬆️'
-			case 'DOWN':
-				return '⬇️'
-			case 'MOVING':
-				return '↕️'
-			case 'FAULT':
-				return '⚠️'
-			default:
-				return '❓'
-		}
+		const IconComponent = BarrierStateIcons[state] || BarrierStateIcons.FAULT
+		return IconComponent("w-5 h-5")
 	}
 
 	// Componentes de iconos SVG para las tabs
@@ -327,9 +522,9 @@ export function CruceDetail() {
 								<p className={`text-2xl font-bold ${getBateriaColor(cruce.bateria)}`}>
 									{cruce.bateria}%
 								</p>
-								{cruce.voltage && (
+								{cruce.battery_voltage && (
 									<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-										{cruce.voltage?.toFixed(2)}V
+										{cruce.battery_voltage?.toFixed(2)}V
 									</p>
 								)}
 							</div>
@@ -345,7 +540,9 @@ export function CruceDetail() {
 						<div className="flex items-center justify-between">
 							<div>
 								<p className="text-sm font-medium text-gray-600 dark:text-gray-400">Sensores Activos</p>
-								<p className="text-2xl font-bold text-gray-900 dark:text-white">{cruce.sensoresActivos}/4</p>
+								<p className="text-2xl font-bold text-gray-900 dark:text-white">
+									{totalSensores > 0 ? `${sensoresActivosCount}/${totalSensores}` : sensoresActivosCount}
+								</p>
 								{cruce.barrier_state && (
 									<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
 										{getBarrierStateIcon(cruce.barrier_state)} {cruce.barrier_state}
@@ -372,8 +569,9 @@ export function CruceDetail() {
 										: 'N/A'}
 								</p>
 								{cruce.solar_power !== undefined && cruce.solar_power !== null && (
-									<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-										☀️ {cruce.solar_power.toFixed(1)}W
+									<p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1.5">
+										{UtilityIcons.sun("w-3.5 h-3.5")}
+										<span>{cruce.solar_power.toFixed(1)}W</span>
 									</p>
 								)}
 							</div>
@@ -393,8 +591,9 @@ export function CruceDetail() {
 									{new Date(cruce.ultimaActividad).toLocaleDateString('es-ES')}
 								</p>
 								{cruce.rssi && (
-									<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-										📶 RSSI: {cruce.rssi} dBm
+									<p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1.5">
+										{UtilityIcons.wifi("w-3.5 h-3.5")}
+										<span>RSSI: {cruce.rssi} dBm</span>
 									</p>
 								)}
 							</div>
@@ -437,26 +636,110 @@ export function CruceDetail() {
 									<div className="space-y-4">
 										<div>
 											<label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Fecha de Instalación</label>
-											<p className="mt-1 text-sm text-gray-900 dark:text-white">{formatearFecha(cruce.fechaInstalacion)}</p>
+											<p className="mt-1 text-sm text-gray-900 dark:text-white">
+												{formatearFecha(cruce.fechaInstalacion || cruce.created_at || cruce.instalacion)}
+											</p>
+											{cruce.created_at && !cruce.fechaInstalacion && (
+												<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+													(Usando fecha de creación del registro)
+												</p>
+											)}
 										</div>
 										<div>
 											<label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Último Mantenimiento</label>
-											<p className="mt-1 text-sm text-gray-900 dark:text-white">{formatearFecha(cruce.ultimoMantenimiento)}</p>
+											{datosMantenimiento.loading ? (
+												<p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Cargando...</p>
+											) : (
+												<>
+													<p className="mt-1 text-sm text-gray-900 dark:text-white">
+														{formatearFecha(
+															datosMantenimiento.ultimoMantenimiento || 
+															cruce.ultimo_mantenimiento || 
+															cruce.ultimoMantenimiento
+														)}
+													</p>
+													{!datosMantenimiento.ultimoMantenimiento && !cruce.ultimo_mantenimiento && !cruce.ultimoMantenimiento && (
+														<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+															No hay registros de mantenimiento completados
+														</p>
+													)}
+												</>
+											)}
 										</div>
 										<div>
 											<label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Próximo Mantenimiento</label>
-											<p className="mt-1 text-sm text-gray-900 dark:text-white">{formatearFecha(cruce.proximoMantenimiento)}</p>
+											{datosMantenimiento.loading ? (
+												<p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Cargando...</p>
+											) : (
+												<>
+													<p className="mt-1 text-sm text-gray-900 dark:text-white">
+														{formatearFecha(
+															datosMantenimiento.proximoMantenimiento || 
+															cruce.proximo_mantenimiento || 
+															cruce.proximoMantenimiento
+														)}
+													</p>
+													{!datosMantenimiento.proximoMantenimiento && !cruce.proximo_mantenimiento && !cruce.proximoMantenimiento && (
+														<p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+															No hay mantenimientos programados
+														</p>
+													)}
+												</>
+											)}
+										</div>
+										<div>
+											<label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Fecha de Registro</label>
+											<p className="mt-1 text-sm text-gray-900 dark:text-white">
+												{formatearFecha(cruce.created_at)}
+											</p>
+										</div>
+										<div>
+											<label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Última Actualización</label>
+											<p className="mt-1 text-sm text-gray-900 dark:text-white">
+												{formatearFecha(cruce.updated_at)}
+											</p>
 										</div>
 									</div>
 									<div className="space-y-4">
-										{cruce.configuracion && (
+										{cruce.configuracion && Object.keys(cruce.configuracion).length > 0 ? (
 											<div>
 												<label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Configuración</label>
 												<div className="mt-1 space-y-2">
-													<p className="text-sm text-gray-900 dark:text-white">Tiempo de alerta: {cruce.configuracion.tiempoAlerta}s</p>
-													<p className="text-sm text-gray-900 dark:text-white">Velocidad máxima: {cruce.configuracion.velocidadMaxima} km/h</p>
-													<p className="text-sm text-gray-900 dark:text-white">Tiempo de barrera: {cruce.configuracion.tiempoBarrera}s</p>
-													<p className="text-sm text-gray-900 dark:text-white">Modo: {cruce.configuracion.modoOperacion}</p>
+													{cruce.configuracion.tiempoAlerta && (
+														<p className="text-sm text-gray-900 dark:text-white">Tiempo de alerta: {cruce.configuracion.tiempoAlerta}s</p>
+													)}
+													{cruce.configuracion.velocidadMaxima && (
+														<p className="text-sm text-gray-900 dark:text-white">Velocidad máxima: {cruce.configuracion.velocidadMaxima} km/h</p>
+													)}
+													{cruce.configuracion.tiempoBarrera && (
+														<p className="text-sm text-gray-900 dark:text-white">Tiempo de barrera: {cruce.configuracion.tiempoBarrera}s</p>
+													)}
+													{cruce.configuracion.modoOperacion && (
+														<p className="text-sm text-gray-900 dark:text-white">Modo: {cruce.configuracion.modoOperacion}</p>
+													)}
+												</div>
+											</div>
+										) : (
+											<div>
+												<label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Configuración</label>
+												<p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+													No hay configuración disponible. Los parámetros de operación se gestionan desde el sistema de control.
+												</p>
+											</div>
+										)}
+										{cruce.estadisticas && (
+											<div>
+												<label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Estadísticas</label>
+												<div className="mt-1 space-y-2">
+													<p className="text-sm text-gray-900 dark:text-white">
+														Total de telemetrías: {cruce.estadisticas.total_telemetrias || 0}
+													</p>
+													<p className="text-sm text-gray-900 dark:text-white">
+														Total de eventos: {cruce.estadisticas.total_eventos || 0}
+													</p>
+													<p className="text-sm text-gray-900 dark:text-white">
+														Alertas activas: {cruce.estadisticas.total_alertas_activas || 0}
+													</p>
 												</div>
 											</div>
 										)}
@@ -473,15 +756,23 @@ export function CruceDetail() {
 										<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
 											<div className="flex items-center justify-between">
 												<span className="text-sm font-medium text-gray-700 dark:text-gray-300">Estado de Barrera</span>
-												<span className="text-2xl">{getBarrierStateIcon(cruce.barrier_state)}</span>
+												<div className="text-gray-600 dark:text-gray-400">
+													{getBarrierStateIcon(cruce.barrier_state)}
+												</div>
 											</div>
 											<p className="text-lg font-bold text-gray-900 dark:text-white mt-2">{cruce.barrier_state}</p>
 										</div>
 									)}
-									{cruce.voltage && (
+									{cruce.barrier_voltage && (
 										<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-											<span className="text-sm font-medium text-gray-700 dark:text-gray-300">Voltaje</span>
-											<p className="text-lg font-bold text-gray-900 dark:text-white mt-2">{cruce.voltage.toFixed(2)} V</p>
+											<span className="text-sm font-medium text-gray-700 dark:text-gray-300">Voltaje de Barrera</span>
+											<p className="text-lg font-bold text-gray-900 dark:text-white mt-2">{cruce.barrier_voltage.toFixed(2)} V</p>
+										</div>
+									)}
+									{cruce.battery_voltage && (
+										<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+											<span className="text-sm font-medium text-gray-700 dark:text-gray-300">Voltaje de Batería</span>
+											<p className="text-lg font-bold text-gray-900 dark:text-white mt-2">{cruce.battery_voltage.toFixed(2)} V</p>
 										</div>
 									)}
 									{cruce.temperature !== undefined && (
@@ -496,25 +787,29 @@ export function CruceDetail() {
 											<p className="text-lg font-bold text-gray-900 dark:text-white mt-2">{cruce.rssi} dBm</p>
 										</div>
 									)}
-									{cruce.vibration !== undefined && (
+									{/* Sensores individuales */}
+									{cruce.sensor_1 !== undefined && cruce.sensor_1 !== null && (
 										<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-											<span className="text-sm font-medium text-gray-700 dark:text-gray-300">Vibración</span>
-											<p className="text-lg font-bold text-gray-900 dark:text-white mt-2">{cruce.vibration.toFixed(3)} m/s²</p>
+											<span className="text-sm font-medium text-gray-700 dark:text-gray-300">Sensor 1 (ADC)</span>
+											<p className="text-lg font-bold text-gray-900 dark:text-white mt-2">{cruce.sensor_1}</p>
 										</div>
 									)}
-									{cruce.solar_power !== undefined && (
+									{cruce.sensor_2 !== undefined && cruce.sensor_2 !== null && (
 										<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-											<span className="text-sm font-medium text-gray-700 dark:text-gray-300">Potencia Solar</span>
-											<p className="text-lg font-bold text-gray-900 dark:text-white mt-2">{cruce.solar_power.toFixed(1)} W</p>
+											<span className="text-sm font-medium text-gray-700 dark:text-gray-300">Sensor 2 (ADC)</span>
+											<p className="text-lg font-bold text-gray-900 dark:text-white mt-2">{cruce.sensor_2}</p>
 										</div>
 									)}
-									{cruce.faults !== undefined && (
+									{cruce.sensor_3 !== undefined && cruce.sensor_3 !== null && (
 										<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-											<span className="text-sm font-medium text-gray-700 dark:text-gray-300">Fallas Detectadas</span>
-											<p className="text-lg font-bold text-gray-900 dark:text-white mt-2">{cruce.faults}</p>
-											<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-												{cruce.faults === 0 ? '✅ Sin fallas' : '⚠️ Revisar sistema'}
-											</p>
+											<span className="text-sm font-medium text-gray-700 dark:text-gray-300">Sensor 3 (ADC)</span>
+											<p className="text-lg font-bold text-gray-900 dark:text-white mt-2">{cruce.sensor_3}</p>
+										</div>
+									)}
+									{cruce.sensor_4 !== undefined && cruce.sensor_4 !== null && (
+										<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+											<span className="text-sm font-medium text-gray-700 dark:text-gray-300">Sensor 4 (ADC)</span>
+											<p className="text-lg font-bold text-gray-900 dark:text-white mt-2">{cruce.sensor_4}</p>
 										</div>
 									)}
 								</div>
@@ -524,23 +819,65 @@ export function CruceDetail() {
 						{activeTab === 'sensores' && (
 							<div className="space-y-6">
 								<h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Estado de Sensores</h3>
-								{cruce.sensores && cruce.sensores.length > 0 ? (
+								{sensoresLoading ? (
+									<div className="text-center py-8 text-gray-500 dark:text-gray-400">
+										<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+										<p>Cargando sensores...</p>
+									</div>
+								) : sensoresData && sensoresData.length > 0 ? (
 									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-										{cruce.sensores.map((sensor) => (
-											<div key={sensor.id} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
-												<div className="flex items-center justify-between mb-2">
-													<h4 className="font-medium text-gray-900 dark:text-white">{sensor.tipo}</h4>
-													<span className={`px-2 py-1 text-xs font-medium rounded-full ${getEstadoStyles(sensor.estado)}`}>
-														{sensor.estado}
-													</span>
+										{sensoresData.map((sensor) => {
+											const estadoDisplay = sensor.estado_display || (sensor.activo ? 'ACTIVO' : 'INACTIVO')
+											const estadoColor = getSensorStatusColor(sensor.estado || (sensor.activo ? 'funcionando' : 'inactivo'))
+											
+											return (
+												<div key={sensor.id} className={`border-2 rounded-lg p-4 ${estadoColor}`}>
+													<div className="flex items-center justify-between mb-2">
+														<h4 className="font-medium text-gray-900 dark:text-white">{sensor.nombre || sensor.tipo || `Sensor ${sensor.id}`}</h4>
+														<span className={`px-2 py-1 text-xs font-medium rounded-full ${getEstadoStyles(estadoDisplay)}`}>
+															{estadoDisplay}
+														</span>
+													</div>
+													<div className="space-y-1 text-sm">
+														{sensor.descripcion && (
+															<p className="text-gray-600 dark:text-gray-400">{sensor.descripcion}</p>
+														)}
+														{sensor.tipo && (
+															<p className="text-gray-600 dark:text-gray-400">
+																<span className="font-medium">Tipo:</span> {sensor.tipo}
+															</p>
+														)}
+														{sensor.valor_actual !== undefined && sensor.valor_actual !== null && (
+															<p className="text-gray-600 dark:text-gray-400">
+																<span className="font-medium">Valor ADC:</span> {sensor.valor_actual}
+															</p>
+														)}
+														{sensor.enviando_datos !== undefined && (
+															<p className="text-gray-600 dark:text-gray-400 flex items-center gap-2">
+																<span className="font-medium">Enviando datos:</span>
+																<span className="flex items-center gap-1.5">
+																	{sensor.enviando_datos ? (
+																		<>
+																			{UtilityIcons.check("w-4 h-4 text-green-600 dark:text-green-400")}
+																			<span>Sí</span>
+																		</>
+																	) : (
+																		<>
+																			{UtilityIcons.cross("w-4 h-4 text-red-600 dark:text-red-400")}
+																			<span>No</span>
+																		</>
+																	)}
+																</span>
+															</p>
+														)}
+													</div>
 												</div>
-												<p className="text-sm text-gray-600 dark:text-gray-400">Ubicación: {sensor.ubicacion}</p>
-											</div>
-										))}
+											)
+										})}
 									</div>
 								) : (
 									<div className="text-center py-8 text-gray-500 dark:text-gray-400">
-										<p>No hay información detallada de sensores disponible</p>
+										<p>No hay sensores registrados para este cruce</p>
 									</div>
 								)}
 							</div>
@@ -549,32 +886,85 @@ export function CruceDetail() {
 						{activeTab === 'trafico' && (
 							<div className="space-y-6">
 								<h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Historial de Tráfico</h3>
-								{cruce.historicoTrafico && cruce.historicoTrafico.length > 0 ? (
+								
+								{/* Estadísticas de tráfico */}
+								<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+									<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+										<p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total de Eventos</p>
+										<p className="text-2xl font-bold text-gray-900 dark:text-white">{estadisticasTrafico.total}</p>
+										<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Todos los tiempos</p>
+									</div>
+									<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+										<p className="text-sm font-medium text-gray-600 dark:text-gray-400">Eventos Hoy</p>
+										<p className="text-2xl font-bold text-gray-900 dark:text-white">{estadisticasTrafico.hoy}</p>
+										<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Últimas 24 horas</p>
+									</div>
+									<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+										<p className="text-sm font-medium text-gray-600 dark:text-gray-400">Esta Semana</p>
+										<p className="text-2xl font-bold text-gray-900 dark:text-white">{estadisticasTrafico.estaSemana}</p>
+										<p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Últimos 7 días</p>
+									</div>
+								</div>
+								
+								{loadingTrafico ? (
+									<div className="text-center py-8 text-gray-500 dark:text-gray-400">
+										<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+										<p>Cargando eventos de tráfico...</p>
+									</div>
+								) : eventosTrafico && eventosTrafico.length > 0 ? (
 									<div className="overflow-x-auto">
 										<table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
 											<thead className="bg-gray-50 dark:bg-gray-700">
 												<tr>
-													<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Fecha</th>
-													<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Trenes</th>
-													<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Velocidad Máxima</th>
+													<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Fecha y Hora</th>
+													<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Estado</th>
+													<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Voltaje</th>
+													<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tipo de Evento</th>
 												</tr>
 											</thead>
 											<tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-												{cruce.historicoTrafico.map((dia, index) => (
-													<tr key={index}>
-														<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-															{new Date(dia.fecha).toLocaleDateString('es-ES')}
-														</td>
-														<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{dia.trenes}</td>
-														<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{dia.velocidadMax} km/h</td>
-													</tr>
-												))}
+												{eventosTrafico.map((evento) => {
+													const fechaEvento = new Date(evento.event_time || evento.timestamp)
+													const estadoColor = evento.state === 'DOWN' 
+														? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' 
+														: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+													const EstadoIcon = evento.state === 'DOWN' 
+														? BarrierStateIcons.DOWN 
+														: BarrierStateIcons.UP
+													
+													return (
+														<tr key={evento.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+															<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+																{fechaEvento.toLocaleString('es-ES', {
+																	year: 'numeric',
+																	month: '2-digit',
+																	day: '2-digit',
+																	hour: '2-digit',
+																	minute: '2-digit'
+																})}
+															</td>
+															<td className="px-6 py-4 whitespace-nowrap">
+																<span className={`px-2 py-1 text-xs font-medium rounded-full ${estadoColor} flex items-center gap-1.5 w-fit`}>
+																	{EstadoIcon("w-4 h-4")}
+																	{evento.state === 'DOWN' ? 'Baja' : 'Sube'}
+																</span>
+															</td>
+															<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+																{evento.voltage_at_event ? `${evento.voltage_at_event.toFixed(2)}V` : 'N/A'}
+															</td>
+															<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+																{evento.state === 'DOWN' ? 'Tren Detectado / Barrera Baja' : 'Tren Pasó / Barrera Sube'}
+															</td>
+														</tr>
+													)
+												})}
 											</tbody>
 										</table>
 									</div>
 								) : (
 									<div className="text-center py-8 text-gray-500 dark:text-gray-400">
-										<p>No hay datos históricos de tráfico disponibles</p>
+										<p>No hay eventos de tráfico registrados para este cruce</p>
+										<p className="text-sm mt-2">Los eventos de tráfico se registran cuando la barrera sube o baja</p>
 									</div>
 								)}
 							</div>

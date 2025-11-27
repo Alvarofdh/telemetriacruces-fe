@@ -147,7 +147,10 @@ export function AlertSystem() {
 			type: 'WARNING',
 			priority: 2,
 			condition: (cruce) => cruce.sensoresActivos < 2,
-			message: (cruce) => `Sensores limitados en ${cruce.nombre}: ${cruce.sensoresActivos}/4 activos`,
+			message: (cruce) => {
+				const totalSensores = cruce.totalSensores || cruce.total_sensores || cruce.sensores?.length || 0
+				return `Sensores limitados en ${cruce.nombre}: ${cruce.sensoresActivos}/${totalSensores} activos`
+			},
 			action: 'Revisar sensores',
 			icon: 'sensor',
 			color: 'orange'

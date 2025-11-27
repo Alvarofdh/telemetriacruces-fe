@@ -150,7 +150,7 @@ export const exportAlertas = async (params = {}) => {
 	}
 	
 	const queryString = queryParams.toString()
-	const endpoint = `/api/alertas/exportar/${queryString ? `?${queryString}` : ''}`
+	const endpoint = `/api/alertas/exportar${queryString ? `?${queryString}` : ''}`
 	
 	return await http.get(endpoint, { responseType: 'blob' })
 }
